@@ -1,0 +1,56 @@
+.ant-layout-header {
+  position: fixed;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.ant-layout-content {
+  margin-top: 64px;
+  background: #f0f2f5;
+  min-height: calc(100vh - 64px);
+}
+
+.upload-dragger {
+  background: #fafafa;
+  border: 1px dashed #d9d9d9;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 20px;
+  text-align: center;
+  transition: border-color 0.3s;
+}
+
+.upload-dragger:hover {
+  border-color: #1890ff;
+}
+
+.task-card {
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.task-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.issue-card {
+  margin-bottom: 16px;
+}
+
+.severity-high {
+  color: #ff4d4f;
+  font-weight: bold;
+}
+
+.severity-medium {
+  color: #faad14;
+  font-weight: bold;
+}
+
+.severity-low {
+  color: #52c41a;
+  font-weight: bold;
+}

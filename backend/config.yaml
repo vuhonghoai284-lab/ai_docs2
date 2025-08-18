@@ -1,0 +1,14 @@
+# 数据库
+database: ./data/app.db
+
+# AI服务
+ai_api: http://localhost:8000
+anthropic_api_key: ""  # 从环境变量ANTHROPIC_API_KEY获取，如果为空则使用模拟模式
+
+# 文件设置  
+max_file_size: 10485760  # 10MB
+chunk_size: 8000
+
+# 目录
+upload_dir: ./data/uploads
+report_dir: ./data/reports
