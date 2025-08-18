@@ -42,19 +42,54 @@ class DocumentIssues(BaseModel):
 class AIService:
     """AI服务封装 - 使用LangChain和OpenAI兼容API"""
     
-    def __init__(self):
-        # 从环境变量获取API配置
-        self.api_key = os.getenv('OPENAI_API_KEY', os.getenv('ANTHROPIC_API_KEY', os.getenv('ANTHROPIC_AUTH_TOKEN', 'dummy-key')))
-        self.api_base = os.getenv('OPENAI_API_BASE', os.getenv('ANTHROPIC_BASE_URL', 'https://api.openai.com/v1'))
-        self.model_name = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+    def _load_config(self):
+        """从配置文件加载AI服务配置"""
+        # 获取AI服务配置
+        ai_config = config.get('ai_service', {})
         
-        # 如果使用Anthropic兼容接口，设置相应的模型名称
-        if 'anthropic' in self.api_base.lower() or 'claude' in self.api_base.lower():
-            self.model_name = os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307')
+        # 获取提供商
+        self.provider = ai_config.get('provider', 'openai')
+        
+        # 根据提供商加载相应配置
+        provider_config = ai_config.get(self.provider, {})
+        default_config = ai_config.get('default', {})
+        
+        # 处理API密钥（支持环境变量）
+        api_key = provider_config.get('api_key', '')
+        if api_key.startswith('${') and api_key.endswith('}'):
+            env_var = api_key[2:-1]
+            api_key = os.getenv(env_var, '')
+        
+        # 处理Base URL（支持环境变量）
+        base_url = provider_config.get('base_url', '')
+        if base_url.startswith('${') and base_url.endswith('}'):
+            env_var = base_url[2:-1]
+            base_url = os.getenv(env_var, '')
+        
+        # 设置配置值（优先使用provider配置，其次使用default配置）
+        self.api_key = api_key or os.getenv('OPENAI_API_KEY', os.getenv('ANTHROPIC_API_KEY', 'dummy-key'))
+        self.api_base = base_url or os.getenv('OPENAI_API_BASE', 'https://api.openai.com/v1')
+        self.model_name = provider_config.get('model', default_config.get('model', 'gpt-4o-mini'))
+        self.temperature = provider_config.get('temperature', default_config.get('temperature', 0.3))
+        self.max_tokens = provider_config.get('max_tokens', default_config.get('max_tokens', 4096))
+        self.timeout = provider_config.get('timeout', default_config.get('timeout', 30))
+        self.max_retries = provider_config.get('max_retries', default_config.get('max_retries', 3))
+        
+        # 降级策略配置
+        self.fallback_config = ai_config.get('fallback', {})
+        self.fallback_enabled = self.fallback_config.get('enabled', False)
+        self.fallback_provider = self.fallback_config.get('provider', None)
+    
+    def __init__(self):
+        # 从配置文件加载AI服务配置
+        self._load_config()
         
         print(f"🤖 AI服务配置:")
+        print(f"   Provider: {self.provider}")
         print(f"   API Base: {self.api_base}")
         print(f"   Model: {self.model_name}")
+        print(f"   Temperature: {self.temperature}")
+        print(f"   Max Tokens: {self.max_tokens}")
         
         try:
             # 初始化ChatOpenAI模型（兼容OpenAI和Anthropic）                
@@ -62,8 +97,10 @@ class AIService:
                 api_key=self.api_key,
                 base_url=self.api_base,
                 model=self.model_name,
-                temperature=0.3,
-                max_tokens=4096
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                request_timeout=self.timeout,
+                max_retries=self.max_retries
             )
             
             # 初始化解析器
