@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import time
 from typing import List, Dict, Optional, Callable
 import asyncio
 from langchain_openai import ChatOpenAI
@@ -10,6 +11,8 @@ from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 from prompt_loader import prompt_loader
 from config_loader import get_ai_service_config
+from sqlalchemy.orm import Session
+from database import AIOutput
 
 # 定义文档章节模型
 class DocumentSection(BaseModel):
@@ -38,8 +41,9 @@ class DocumentIssues(BaseModel):
 class AIService:
     """AI服务封装 - 使用LangChain和OpenAI兼容API"""
     
-    def __init__(self):
+    def __init__(self, db_session: Optional[Session] = None):
         """初始化AI服务"""
+        self.db = db_session
         # 使用配置加载器获取配置
         self.config = get_ai_service_config()
         
@@ -85,9 +89,10 @@ class AIService:
             print(f"❌ AI服务初始化失败: {str(e)}")
             raise
     
-    async def preprocess_document(self, text: str) -> List[Dict]:
+    async def preprocess_document(self, text: str, task_id: Optional[int] = None) -> List[Dict]:
         """预处理文档：章节分割和内容整理 - 通过AI一次性完成"""
         print("📝 开始文档预处理...")
+        start_time = time.time()
         
         try:
             # 从模板加载提示词
@@ -108,6 +113,18 @@ class AIService:
             
             # 调用模型
             response = await asyncio.to_thread(self.model.invoke, messages)
+            processing_time = time.time() - start_time
+            
+            # 保存AI输出到数据库
+            if self.db and task_id:
+                ai_output = AIOutput(
+                    task_id=task_id,
+                    operation_type="preprocess",
+                    input_text=text[:10000],  # 保存部分输入文本
+                    raw_output=response.content,
+                    processing_time=processing_time,
+                    status="success"
+                )
             
             # 解析响应
             try:
@@ -131,19 +148,49 @@ class AIService:
                 else:
                     result = {"sections": [{"section_title": "文档内容", "content": text, "level": 1}]}
                 
+                # 更新数据库中的解析结果
+                if self.db and task_id:
+                    ai_output.parsed_output = result
+                    self.db.add(ai_output)
+                    self.db.commit()
+                
                 print(f"✅ 文档预处理完成，识别到 {len(result.get('sections', []))} 个章节")
                 return result.get('sections', [])
                 
             except Exception as e:
                 print(f"⚠️ 文档结构解析失败，使用原始文本: {str(e)}")
+                
+                # 保存解析错误信息
+                if self.db and task_id:
+                    ai_output.status = "parsing_error"
+                    ai_output.error_message = str(e)
+                    self.db.add(ai_output)
+                    self.db.commit()
+                
                 return [{"section_title": "文档内容", "content": text, "level": 1}]
                 
         except Exception as e:
             print(f"❌ 文档预处理失败: {str(e)}")
+            processing_time = time.time() - start_time
+            
+            # 保存错误信息到数据库
+            if self.db and task_id:
+                ai_output = AIOutput(
+                    task_id=task_id,
+                    operation_type="preprocess",
+                    input_text=text[:10000],
+                    raw_output="",
+                    status="failed",
+                    error_message=str(e),
+                    processing_time=processing_time
+                )
+                self.db.add(ai_output)
+                self.db.commit()
+            
             # 返回原始文本作为单一章节
             return [{"section_title": "文档内容", "content": text, "level": 1}]
     
-    async def detect_issues(self, text: str, progress_callback: Optional[Callable] = None) -> List[Dict]:
+    async def detect_issues(self, text: str, progress_callback: Optional[Callable] = None, task_id: Optional[int] = None) -> List[Dict]:
         """调用AI检测文档问题 - 使用异步批量处理"""
         
         # 如果文本太短，直接返回空列表
@@ -155,7 +202,7 @@ class AIService:
             await progress_callback("正在分析文档结构...", 10)
         
         # 先进行文档预处理
-        sections = await self.preprocess_document(text)
+        sections = await self.preprocess_document(text, task_id)
         total_sections = len(sections)
         
         if progress_callback:
@@ -179,6 +226,7 @@ class AIService:
             """异步检测单个章节的问题"""
             section_title = section.get('section_title', '未知章节')
             section_content = section.get('content', '')
+            section_start_time = time.time()
             
             # 更新进度
             progress = 20 + int((index / len(valid_sections)) * 70)
@@ -207,6 +255,20 @@ class AIService:
                 
                 # 调用模型
                 response = await asyncio.to_thread(self.model.invoke, messages)
+                processing_time = time.time() - section_start_time
+                
+                # 保存AI输出到数据库
+                if self.db and task_id:
+                    ai_output = AIOutput(
+                        task_id=task_id,
+                        operation_type="detect_issues",
+                        section_title=section_title,
+                        section_index=index,
+                        input_text=section_content[:4000],
+                        raw_output=response.content,
+                        processing_time=processing_time,
+                        status="success"
+                    )
                 
                 # 解析响应
                 try:
@@ -222,6 +284,12 @@ class AIService:
                     else:
                         result = {"issues": []}
                     
+                    # 更新数据库中的解析结果
+                    if self.db and task_id:
+                        ai_output.parsed_output = result
+                        self.db.add(ai_output)
+                        self.db.commit()
+                    
                     # 为每个问题添加章节信息
                     issues = result.get('issues', [])
                     for issue in issues:
@@ -233,10 +301,36 @@ class AIService:
                     
                 except Exception as e:
                     print(f"⚠️ 解析章节 '{section_title}' 的响应失败: {str(e)}")
+                    
+                    # 保存解析错误信息
+                    if self.db and task_id:
+                        ai_output.status = "parsing_error"
+                        ai_output.error_message = str(e)
+                        self.db.add(ai_output)
+                        self.db.commit()
+                    
                     return []
                     
             except Exception as e:
                 print(f"❌ 检测章节 '{section_title}' 失败: {str(e)}")
+                processing_time = time.time() - section_start_time
+                
+                # 保存错误信息到数据库
+                if self.db and task_id:
+                    ai_output = AIOutput(
+                        task_id=task_id,
+                        operation_type="detect_issues",
+                        section_title=section_title,
+                        section_index=index,
+                        input_text=section_content[:4000],
+                        raw_output="",
+                        status="failed",
+                        error_message=str(e),
+                        processing_time=processing_time
+                    )
+                    self.db.add(ai_output)
+                    self.db.commit()
+                
                 return []
         
         # 批量并发执行所有章节的检测

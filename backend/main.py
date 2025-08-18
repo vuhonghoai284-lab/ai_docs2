@@ -11,7 +11,7 @@ from datetime import datetime
 import asyncio
 import yaml
 
-from database import get_db, Task, Issue
+from database import get_db, Task, Issue, AIOutput
 from task_processor import task_processor
 from report_generator import generate_report
 
@@ -61,6 +61,21 @@ class IssueResponse(BaseModel):
     suggestion: str
     feedback_type: Optional[str]
     feedback_comment: Optional[str]
+
+class AIOutputResponse(BaseModel):
+    id: int
+    task_id: int
+    operation_type: str
+    section_title: Optional[str]
+    section_index: Optional[int]
+    input_text: str
+    raw_output: str
+    parsed_output: Optional[dict]
+    status: str
+    error_message: Optional[str]
+    tokens_used: Optional[int]
+    processing_time: Optional[float]
+    created_at: datetime
 
 # API端点
 @app.get("/")
@@ -219,6 +234,37 @@ def download_report(task_id: int, db: Session = Depends(get_db)):
         )
     except Exception as e:
         raise HTTPException(500, f"报告生成失败: {str(e)}")
+
+@app.get("/api/tasks/{task_id}/ai-outputs", response_model=List[AIOutputResponse])
+def get_task_ai_outputs(
+    task_id: int,
+    operation_type: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """获取任务的AI输出记录"""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(404, "任务不存在")
+    
+    query = db.query(AIOutput).filter(AIOutput.task_id == task_id)
+    
+    # 按操作类型过滤
+    if operation_type:
+        query = query.filter(AIOutput.operation_type == operation_type)
+    
+    # 按创建时间排序
+    ai_outputs = query.order_by(AIOutput.created_at).all()
+    
+    return ai_outputs
+
+@app.get("/api/ai-outputs/{output_id}", response_model=AIOutputResponse)
+def get_ai_output_detail(output_id: int, db: Session = Depends(get_db)):
+    """获取单个AI输出详情"""
+    ai_output = db.query(AIOutput).filter(AIOutput.id == output_id).first()
+    if not ai_output:
+        raise HTTPException(404, "AI输出记录不存在")
+    
+    return ai_output
 
 if __name__ == "__main__":
     import uvicorn

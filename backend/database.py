@@ -1,5 +1,5 @@
 """数据库模型定义"""
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Text, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Text, ForeignKey, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -32,6 +32,7 @@ class Task(Base):
     
     # 关系
     issues = relationship("Issue", back_populates="task", cascade="all, delete-orphan")
+    ai_outputs = relationship("AIOutput", back_populates="task", cascade="all, delete-orphan")
 
 # 检测问题表
 class Issue(Base):
@@ -51,6 +52,27 @@ class Issue(Base):
     
     # 关系
     task = relationship("Task", back_populates="issues")
+
+# AI模型输出记录表
+class AIOutput(Base):
+    __tablename__ = "ai_outputs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"))
+    operation_type = Column(String(50))  # preprocess/detect_issues
+    section_title = Column(String(500), nullable=True)  # 章节标题（如果是按章节处理）
+    section_index = Column(Integer, nullable=True)  # 章节索引
+    input_text = Column(Text)  # 输入给AI的文本
+    raw_output = Column(Text)  # AI的原始输出
+    parsed_output = Column(JSON, nullable=True)  # 解析后的结构化输出
+    status = Column(String(20))  # success/failed/parsing_error
+    error_message = Column(Text, nullable=True)  # 错误信息
+    tokens_used = Column(Integer, nullable=True)  # 使用的token数量
+    processing_time = Column(Float, nullable=True)  # 处理时间（秒）
+    created_at = Column(DateTime, default=datetime.now)
+    
+    # 关系
+    task = relationship("Task", back_populates="ai_outputs")
 
 # 创建表
 Base.metadata.create_all(bind=engine)

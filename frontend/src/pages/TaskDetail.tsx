@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Tag, Progress, Space, message, Spin, Empty, Input, Radio } from 'antd';
-import { ArrowLeftOutlined, DownloadOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { Card, Button, Tag, Progress, Space, message, Spin, Empty, Input, Radio, Tabs, Collapse, Typography } from 'antd';
+import { ArrowLeftOutlined, DownloadOutlined, CheckOutlined, CloseOutlined, CodeOutlined, RobotOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { taskAPI } from '../api';
-import { TaskDetail as TaskDetailType, Issue } from '../types';
+import { TaskDetail as TaskDetailType, Issue, AIOutput } from '../types';
+
+const { Text, Paragraph } = Typography;
+const { Panel } = Collapse;
 
 const TaskDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -11,6 +14,8 @@ const TaskDetail: React.FC = () => {
   const [taskDetail, setTaskDetail] = useState<TaskDetailType | null>(null);
   const [loading, setLoading] = useState(true);
   const [feedbackLoading, setFeedbackLoading] = useState<{ [key: number]: boolean }>({});
+  const [aiOutputs, setAiOutputs] = useState<AIOutput[]>([]);
+  const [aiOutputsLoading, setAiOutputsLoading] = useState(false);
 
   const loadTaskDetail = async () => {
     if (!id) return;
@@ -18,10 +23,28 @@ const TaskDetail: React.FC = () => {
     try {
       const data = await taskAPI.getTaskDetail(parseInt(id));
       setTaskDetail(data);
+      
+      // 加载AI输出记录
+      if (data.task.status === 'completed' || data.task.status === 'processing') {
+        loadAIOutputs();
+      }
     } catch (error) {
       message.error('加载任务详情失败');
     }
     setLoading(false);
+  };
+
+  const loadAIOutputs = async () => {
+    if (!id) return;
+    
+    setAiOutputsLoading(true);
+    try {
+      const outputs = await taskAPI.getTaskAIOutputs(parseInt(id));
+      setAiOutputs(outputs);
+    } catch (error) {
+      console.error('加载AI输出失败:', error);
+    }
+    setAiOutputsLoading(false);
   };
 
   useEffect(() => {
@@ -255,6 +278,212 @@ const TaskDetail: React.FC = () => {
                 <p style={{ marginTop: 16 }}>任务正在处理中，请稍候...</p>
                 <Progress percent={Math.round(task.progress)} />
               </div>
+            </Card>
+          )}
+
+          {/* AI模型输出记录 */}
+          {(task.status === 'completed' || task.status === 'processing') && (
+            <Card 
+              size="small" 
+              title={
+                <Space>
+                  <RobotOutlined />
+                  <span>AI模型处理过程</span>
+                </Space>
+              }
+              extra={
+                <Button 
+                  size="small" 
+                  onClick={loadAIOutputs} 
+                  loading={aiOutputsLoading}
+                >
+                  刷新
+                </Button>
+              }
+            >
+              {aiOutputsLoading ? (
+                <div style={{ textAlign: 'center', padding: 20 }}>
+                  <Spin />
+                </div>
+              ) : aiOutputs.length === 0 ? (
+                <Empty description="暂无AI处理记录" />
+              ) : (
+                <Tabs defaultActiveKey="preprocess">
+                  <Tabs.TabPane tab="文档预处理" key="preprocess">
+                    <Collapse>
+                      {aiOutputs
+                        .filter(output => output.operation_type === 'preprocess')
+                        .map((output, index) => (
+                          <Panel 
+                            header={
+                              <Space>
+                                <Text>预处理 #{index + 1}</Text>
+                                <Tag color={output.status === 'success' ? 'green' : output.status === 'failed' ? 'red' : 'orange'}>
+                                  {output.status}
+                                </Tag>
+                                {output.processing_time && (
+                                  <Text type="secondary">耗时: {output.processing_time.toFixed(2)}秒</Text>
+                                )}
+                              </Space>
+                            }
+                            key={output.id}
+                          >
+                            <Space direction="vertical" style={{ width: '100%' }}>
+                              <div>
+                                <Text strong>输入文本（前1000字符）：</Text>
+                                <Paragraph 
+                                  style={{ 
+                                    background: '#f5f5f5', 
+                                    padding: 10, 
+                                    borderRadius: 4,
+                                    maxHeight: 200,
+                                    overflow: 'auto'
+                                  }}
+                                >
+                                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                                    {output.input_text.substring(0, 1000)}...
+                                  </pre>
+                                </Paragraph>
+                              </div>
+                              
+                              <div>
+                                <Text strong>AI原始输出：</Text>
+                                <Paragraph 
+                                  style={{ 
+                                    background: '#f0f2f5', 
+                                    padding: 10, 
+                                    borderRadius: 4,
+                                    maxHeight: 300,
+                                    overflow: 'auto'
+                                  }}
+                                >
+                                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                                    {output.raw_output}
+                                  </pre>
+                                </Paragraph>
+                              </div>
+                              
+                              {output.parsed_output && (
+                                <div>
+                                  <Text strong>解析结果：</Text>
+                                  <Paragraph 
+                                    style={{ 
+                                      background: '#e6f7ff', 
+                                      padding: 10, 
+                                      borderRadius: 4,
+                                      maxHeight: 300,
+                                      overflow: 'auto'
+                                    }}
+                                  >
+                                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                                      {JSON.stringify(output.parsed_output, null, 2)}
+                                    </pre>
+                                  </Paragraph>
+                                </div>
+                              )}
+                              
+                              {output.error_message && (
+                                <div>
+                                  <Text strong type="danger">错误信息：</Text>
+                                  <Paragraph type="danger">
+                                    {output.error_message}
+                                  </Paragraph>
+                                </div>
+                              )}
+                            </Space>
+                          </Panel>
+                        ))}
+                    </Collapse>
+                  </Tabs.TabPane>
+                  
+                  <Tabs.TabPane tab="问题检测" key="detect_issues">
+                    <Collapse>
+                      {aiOutputs
+                        .filter(output => output.operation_type === 'detect_issues')
+                        .map((output) => (
+                          <Panel 
+                            header={
+                              <Space>
+                                <Text>{output.section_title || `章节 ${(output.section_index ?? 0) + 1}`}</Text>
+                                <Tag color={output.status === 'success' ? 'green' : output.status === 'failed' ? 'red' : 'orange'}>
+                                  {output.status}
+                                </Tag>
+                                {output.processing_time && (
+                                  <Text type="secondary">耗时: {output.processing_time.toFixed(2)}秒</Text>
+                                )}
+                              </Space>
+                            }
+                            key={output.id}
+                          >
+                            <Space direction="vertical" style={{ width: '100%' }}>
+                              <div>
+                                <Text strong>章节内容（前1000字符）：</Text>
+                                <Paragraph 
+                                  style={{ 
+                                    background: '#f5f5f5', 
+                                    padding: 10, 
+                                    borderRadius: 4,
+                                    maxHeight: 200,
+                                    overflow: 'auto'
+                                  }}
+                                >
+                                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                                    {output.input_text.substring(0, 1000)}...
+                                  </pre>
+                                </Paragraph>
+                              </div>
+                              
+                              <div>
+                                <Text strong>AI检测输出：</Text>
+                                <Paragraph 
+                                  style={{ 
+                                    background: '#f0f2f5', 
+                                    padding: 10, 
+                                    borderRadius: 4,
+                                    maxHeight: 300,
+                                    overflow: 'auto'
+                                  }}
+                                >
+                                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                                    {output.raw_output}
+                                  </pre>
+                                </Paragraph>
+                              </div>
+                              
+                              {output.parsed_output && (
+                                <div>
+                                  <Text strong>检测到的问题：</Text>
+                                  <Paragraph 
+                                    style={{ 
+                                      background: '#fff1f0', 
+                                      padding: 10, 
+                                      borderRadius: 4,
+                                      maxHeight: 300,
+                                      overflow: 'auto'
+                                    }}
+                                  >
+                                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                                      {JSON.stringify(output.parsed_output, null, 2)}
+                                    </pre>
+                                  </Paragraph>
+                                </div>
+                              )}
+                              
+                              {output.error_message && (
+                                <div>
+                                  <Text strong type="danger">错误信息：</Text>
+                                  <Paragraph type="danger">
+                                    {output.error_message}
+                                  </Paragraph>
+                                </div>
+                              )}
+                            </Space>
+                          </Panel>
+                        ))}
+                    </Collapse>
+                  </Tabs.TabPane>
+                </Tabs>
+              )}
             </Card>
           )}
         </Space>

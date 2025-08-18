@@ -1,6 +1,6 @@
 // API服务封装
 import axios from 'axios';
-import { Task, TaskDetail } from './types';
+import { Task, TaskDetail, AIOutput } from './types';
 
 const API_BASE = 'http://localhost:8080/api';
 
@@ -70,5 +70,18 @@ export const taskAPI = {
     link.click();
     link.remove();
     window.URL.revokeObjectURL(url);
+  },
+
+  // 获取任务的AI输出记录
+  getTaskAIOutputs: async (taskId: number, operationType?: string) => {
+    const params = operationType ? { operation_type: operationType } : {};
+    const response = await api.get<AIOutput[]>(`/tasks/${taskId}/ai-outputs`, { params });
+    return response.data;
+  },
+
+  // 获取单个AI输出详情
+  getAIOutputDetail: async (outputId: number) => {
+    const response = await api.get<AIOutput>(`/ai-outputs/${outputId}`);
+    return response.data;
   },
 };

@@ -1,5 +1,4 @@
 """任务处理模块"""
-import asyncio
 from datetime import datetime
 from typing import List
 from sqlalchemy.orm import Session
@@ -12,7 +11,7 @@ class TaskProcessor:
     
     def __init__(self):
         self.file_parser = FileParser()
-        self.ai_service = AIService()
+        self.ai_service = None  # Will be initialized with db session in process_task
     
     def split_text(self, text: str, chunk_size: int = 8000) -> List[str]:
         """文本分块"""
@@ -26,6 +25,9 @@ class TaskProcessor:
     
     async def process_task(self, task_id: int, db: Session):
         """处理单个任务"""
+        # 初始化AI服务，传入数据库会话
+        self.ai_service = AIService(db_session=db)
+        
         # 获取任务
         task = db.query(Task).filter(Task.id == task_id).first()
         if not task:
@@ -74,8 +76,8 @@ class TaskProcessor:
                     actual_progress = base_progress + (chunk_progress_range * pct / 100)
                     await update_progress(f"[块{i+1}/{len(chunks)}] {msg}", int(actual_progress))
                 
-                # 使用进度回调检测问题
-                issues = await self.ai_service.detect_issues(chunk, chunk_progress_callback)
+                # 使用进度回调检测问题，传入task_id以保存AI输出
+                issues = await self.ai_service.detect_issues(chunk, chunk_progress_callback, task_id)
                 
                 # 添加块索引到位置信息
                 for issue in issues:

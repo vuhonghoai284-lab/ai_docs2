@@ -27,3 +27,19 @@ export interface TaskDetail {
   task: Task;
   issues: Issue[];
 }
+
+export interface AIOutput {
+  id: number;
+  task_id: number;
+  operation_type: string;
+  section_title?: string;
+  section_index?: number;
+  input_text: string;
+  raw_output: string;
+  parsed_output?: any;
+  status: string;
+  error_message?: string;
+  tokens_used?: number;
+  processing_time?: number;
+  created_at: string;
+}
