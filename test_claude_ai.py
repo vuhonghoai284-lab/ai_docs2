@@ -16,13 +16,6 @@ async def test_ai_service():
     # 初始化服务
     ai_service = AIService()
     
-    if ai_service.use_mock:
-        print("⚠️  使用模拟模式（未检测到ANTHROPIC_API_KEY）")
-        print("💡 要使用真实Claude API，请设置环境变量：")
-        print("   export ANTHROPIC_API_KEY=your_api_key")
-    else:
-        print("✅ 使用真实Claude API")
-    
     print("\n" + "="*50)
     
     # 测试文档

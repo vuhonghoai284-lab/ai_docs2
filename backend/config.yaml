@@ -3,7 +3,7 @@ database: ./data/app.db
 
 # AI服务
 ai_api: http://localhost:8000
-anthropic_api_key: ""  # 从环境变量ANTHROPIC_API_KEY获取，如果为空则使用模拟模式
+anthropic_api_key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEwMCwiZW1haWwiOiIyMDE4OTEwMzExQHFxLmNvbSIsImlzQWRtaW4iOmZhbHNlLCJpYXQiOjE3NTU0ODQzODUsImV4cCI6MTc1NjA4OTE4NX0.hCdyLATOyI5Ij_5_50l1F4yJY73P7erZBji-F-LuADs"  # 从环境变量ANTHROPIC_API_KEY获取，如果为空则使用模拟模式
 
 # 文件设置  
 max_file_size: 10485760  # 10MB

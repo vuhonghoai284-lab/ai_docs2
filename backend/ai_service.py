@@ -1,17 +1,30 @@
-"""AI服务模块 - 使用LangChain调用Claude API"""
+"""AI服务模块 - 使用LangChain调用OpenAI兼容API"""
 import json
 import os
-from typing import List, Dict, Optional
+import re
+from typing import List, Dict, Optional, Callable
 import yaml
 import asyncio
-from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
+from prompt_loader import prompt_loader
 
 # 加载配置
 with open('config.yaml', 'r', encoding='utf-8') as f:
     config = yaml.safe_load(f)
+
+# 定义文档章节模型
+class DocumentSection(BaseModel):
+    """文档章节"""
+    section_title: str = Field(description="章节标题")
+    content: str = Field(description="章节内容")
+    level: int = Field(description="章节层级，1为一级标题，2为二级标题等")
+
+class DocumentStructure(BaseModel):
+    """文档结构"""
+    sections: List[DocumentSection] = Field(description="文档章节列表")
 
 # 定义结构化输出模型
 class DocumentIssue(BaseModel):
@@ -24,62 +37,58 @@ class DocumentIssue(BaseModel):
 
 class DocumentIssues(BaseModel):
     """文档问题列表"""
-    issues: List[DocumentIssue] = Field(description="发现的所有问题")
+    issues: List[DocumentIssue] = Field(description="发现的所有问题", default=[])
 
 class AIService:
-    """AI服务封装 - 使用LangChain和Claude"""
+    """AI服务封装 - 使用LangChain和OpenAI兼容API"""
     
     def __init__(self):
-        # 从环境变量获取API密钥，如果没有则使用配置文件中的默认值
-        self.api_key = os.getenv('ANTHROPIC_API_KEY', config.get('anthropic_api_key', ''))
-        self.use_mock = not bool(self.api_key)  # 如果没有API密钥，使用模拟模式
+        # 从环境变量获取API配置
+        self.api_key = os.getenv('OPENAI_API_KEY', os.getenv('ANTHROPIC_API_KEY', os.getenv('ANTHROPIC_AUTH_TOKEN', 'dummy-key')))
+        self.api_base = os.getenv('OPENAI_API_BASE', os.getenv('ANTHROPIC_BASE_URL', 'https://api.openai.com/v1'))
+        self.model_name = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
         
-        if not self.use_mock:
-            try:
-                # 初始化Claude模型
-                self.model = ChatAnthropic(
-                    api_key=self.api_key,
-                    model_name="claude-3-haiku-20240307",  # 使用更经济的模型
-                    temperature=0.3,
-                    max_tokens=4096
-                )
-                # 初始化JSON解析器
-                self.parser = JsonOutputParser(pydantic_object=DocumentIssues)
-            except Exception as e:
-                print(f"初始化Claude API失败，将使用模拟模式: {str(e)}")
-                self.use_mock = True
-    
-    async def detect_issues(self, text: str) -> List[Dict]:
-        """调用AI检测文档问题"""
+        # 如果使用Anthropic兼容接口，设置相应的模型名称
+        if 'anthropic' in self.api_base.lower() or 'claude' in self.api_base.lower():
+            self.model_name = os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307')
         
-        # 如果文本太短，直接返回空列表
-        if len(text) < 50:
-            return []
-        
-        # 如果使用模拟模式
-        if self.use_mock:
-            return await self._mock_detect_issues(text)
+        print(f"🤖 AI服务配置:")
+        print(f"   API Base: {self.api_base}")
+        print(f"   Model: {self.model_name}")
         
         try:
-            # 构建系统提示
-            system_prompt = """你是一个专业的技术文档审查专家。你的任务是分析文档内容，找出其中的质量问题。
-
-请重点关注以下几个方面：
-1. 语法规范性：错别字、标点符号错误、专业术语使用不当
-2. 逻辑完整性：章节结构是否清晰、内容是否连贯、是否有逻辑矛盾
-3. 内容质量：描述是否清晰、示例是否完整、是否缺少必要信息
-
-请严格按照指定的JSON格式输出结果。如果没有发现问题，返回空的issues数组。"""
-
+            # 初始化ChatOpenAI模型（兼容OpenAI和Anthropic）                
+            self.model = ChatOpenAI(
+                api_key=self.api_key,
+                base_url=self.api_base,
+                model=self.model_name,
+                temperature=0.3,
+                max_tokens=4096
+            )
+            
+            # 初始化解析器
+            self.structure_parser = PydanticOutputParser(pydantic_object=DocumentStructure)
+            self.issues_parser = PydanticOutputParser(pydantic_object=DocumentIssues)
+            print("✅ AI服务初始化成功")
+            
+        except Exception as e:
+            print(f"❌ AI服务初始化失败: {str(e)}")
+            raise
+    
+    async def preprocess_document(self, text: str) -> List[Dict]:
+        """预处理文档：章节分割和内容整理 - 通过AI一次性完成"""
+        print("📝 开始文档预处理...")
+        
+        try:
+            # 从模板加载提示词
+            system_prompt = prompt_loader.get_system_prompt('document_preprocess')
+            
             # 构建用户提示
-            user_prompt = f"""请分析以下技术文档的质量问题，并按照JSON格式输出：
-
-{self.parser.get_format_instructions()}
-
-文档内容（最多分析前8000字符）：
-{text[:8000]}
-
-请仔细分析并输出发现的问题。如果文档质量良好，可以返回空的issues数组。"""
+            user_prompt = prompt_loader.get_user_prompt(
+                'document_preprocess',
+                format_instructions=self.structure_parser.get_format_instructions(),
+                document_content=text[:10000]  # 限制长度以避免超出token限制
+            )
 
             # 创建消息
             messages = [
@@ -92,99 +101,164 @@ class AIService:
             
             # 解析响应
             try:
-                # 尝试从响应中提取JSON内容
                 content = response.content
+                # 尝试解析JSON
                 if isinstance(content, str):
                     # 查找JSON内容
-                    import re
                     json_match = re.search(r'\{.*\}', content, re.DOTALL)
                     if json_match:
                         json_str = json_match.group()
                         result = json.loads(json_str)
                     else:
-                        # 如果没有找到JSON，尝试直接解析
-                        result = self.parser.parse(content)
+                        # 如果没有找到JSON，返回原文作为单一章节
+                        result = {
+                            "sections": [{
+                                "section_title": "文档内容",
+                                "content": text,
+                                "level": 1
+                            }]
+                        }
                 else:
-                    result = self.parser.parse(str(content))
+                    result = {"sections": [{"section_title": "文档内容", "content": text, "level": 1}]}
                 
-                # 转换为字典列表
-                if isinstance(result, dict) and 'issues' in result:
-                    issues = result['issues']
-                elif isinstance(result, DocumentIssues):
-                    issues = [issue.dict() for issue in result.issues]
-                else:
-                    issues = []
-                
-                return issues
+                print(f"✅ 文档预处理完成，识别到 {len(result.get('sections', []))} 个章节")
+                return result.get('sections', [])
                 
             except Exception as e:
-                print(f"解析AI响应失败: {str(e)}")
-                # 如果解析失败，返回一个基础问题
-                return [{
-                    "type": "内容",
-                    "description": "文档可能存在一些需要改进的地方",
-                    "location": "文档整体",
-                    "severity": "低",
-                    "suggestion": "建议进行人工复查"
-                }]
-            
+                print(f"⚠️ 文档结构解析失败，使用原始文本: {str(e)}")
+                return [{"section_title": "文档内容", "content": text, "level": 1}]
+                
         except Exception as e:
-            print(f"AI服务调用失败: {str(e)}")
-            # 返回模拟数据作为降级方案
-            return await self._mock_detect_issues(text)
+            print(f"❌ 文档预处理失败: {str(e)}")
+            # 返回原始文本作为单一章节
+            return [{"section_title": "文档内容", "content": text, "level": 1}]
     
-    async def _mock_detect_issues(self, text: str) -> List[Dict]:
-        """模拟检测（用于测试或API不可用时）"""
-        await asyncio.sleep(1)  # 模拟网络延迟
+    
+    async def detect_issues(self, text: str, progress_callback: Optional[Callable] = None) -> List[Dict]:
+        """调用AI检测文档问题 - 使用异步批量处理"""
         
-        # 基于文本长度和内容生成模拟问题
-        mock_issues = []
+        # 如果文本太短，直接返回空列表
+        if len(text) < 50:
+            return []
         
-        # 检查常见问题
-        if "测试" in text or "test" in text.lower():
-            mock_issues.append({
-                "type": "内容",
-                "description": "文档中包含测试相关内容，可能需要更新为正式版本",
-                "location": "文档中包含'测试'关键词的位置",
-                "severity": "中",
-                "suggestion": "建议检查并替换测试内容为正式内容"
-            })
+        # 更新进度：开始文档预处理
+        if progress_callback:
+            await progress_callback("正在分析文档结构...", 10)
         
-        if len(text) > 1000 and "## " not in text and "# " not in text:
-            mock_issues.append({
-                "type": "逻辑",
-                "description": "文档缺少清晰的章节结构",
-                "location": "文档整体",
-                "severity": "中",
-                "suggestion": "建议添加章节标题，使用Markdown格式组织内容"
-            })
+        # 先进行文档预处理
+        sections = await self.preprocess_document(text)
+        total_sections = len(sections)
         
-        if len([line for line in text.split('\n') if len(line) > 200]) > 0:
-            mock_issues.append({
-                "type": "语法",
-                "description": "存在过长的段落，影响阅读体验",
-                "location": "超长段落位置",
-                "severity": "低",
-                "suggestion": "建议将长段落拆分为多个短段落"
-            })
+        if progress_callback:
+            await progress_callback(f"文档已拆分为 {total_sections} 个章节", 20)
         
-        # 如果没有发现问题，添加一个通用建议
-        if not mock_issues and len(text) > 100:
-            mock_issues.append({
-                "type": "内容",
-                "description": "文档基本符合规范，但可以进一步优化",
-                "location": "文档整体",
-                "severity": "低",
-                "suggestion": "建议增加更多示例和详细说明"
-            })
+        # 过滤掉太短的章节
+        valid_sections = [
+            section for section in sections 
+            if len(section.get('content', '')) >= 20
+        ]
         
-        return mock_issues
+        if not valid_sections:
+            if progress_callback:
+                await progress_callback("没有有效的章节需要检测", 100)
+            return []
+        
+        print(f"📊 准备检测 {len(valid_sections)} 个有效章节")
+        
+        # 创建异步检测任务
+        async def detect_section_issues(section: Dict, index: int) -> List[Dict]:
+            """异步检测单个章节的问题"""
+            section_title = section.get('section_title', '未知章节')
+            section_content = section.get('content', '')
+            
+            # 更新进度
+            progress = 20 + int((index / len(valid_sections)) * 70)
+            if progress_callback:
+                await progress_callback(f"正在检测章节 {index + 1}/{len(valid_sections)}: {section_title}", progress)
+            
+            print(f"🔍 [{index + 1}/{len(valid_sections)}] 检测章节: {section_title}")
+            
+            try:
+                # 从模板加载提示词
+                system_prompt = prompt_loader.get_system_prompt('document_detect_issues')
+                
+                # 构建用户提示
+                user_prompt = prompt_loader.get_user_prompt(
+                    'document_detect_issues',
+                    section_title=section_title,
+                    format_instructions=self.issues_parser.get_format_instructions(),
+                    section_content=section_content[:4000]  # 限制每个章节的长度
+                )
+
+                # 创建消息
+                messages = [
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=user_prompt)
+                ]
+                
+                # 调用模型
+                response = await asyncio.to_thread(self.model.invoke, messages)
+                
+                # 解析响应
+                try:
+                    content = response.content
+                    if isinstance(content, str):
+                        # 查找JSON内容
+                        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                        if json_match:
+                            json_str = json_match.group()
+                            result = json.loads(json_str)
+                        else:
+                            result = {"issues": []}
+                    else:
+                        result = {"issues": []}
+                    
+                    # 为每个问题添加章节信息
+                    issues = result.get('issues', [])
+                    for issue in issues:
+                        if 'location' in issue and not section_title in issue['location']:
+                            issue['location'] = f"{section_title} - {issue['location']}"
+                    
+                    print(f"✓ 章节 '{section_title}' 检测完成，发现 {len(issues)} 个问题")
+                    return issues
+                    
+                except Exception as e:
+                    print(f"⚠️ 解析章节 '{section_title}' 的响应失败: {str(e)}")
+                    return []
+                    
+            except Exception as e:
+                print(f"❌ 检测章节 '{section_title}' 失败: {str(e)}")
+                return []
+        
+        # 批量并发执行所有章节的检测
+        print(f"🚀 开始并发检测 {len(valid_sections)} 个章节...")
+        
+        # 创建所有检测任务
+        tasks = [
+            detect_section_issues(section, index) 
+            for index, section in enumerate(valid_sections)
+        ]
+        
+        # 并发执行所有任务
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # 合并所有检测结果
+        all_issues = []
+        for result in results:
+            if isinstance(result, list):
+                all_issues.extend(result)
+            elif isinstance(result, Exception):
+                print(f"⚠️ 某个章节检测出现异常: {str(result)}")
+        
+        # 更新进度：完成
+        if progress_callback:
+            await progress_callback(f"文档检测完成，共发现 {len(all_issues)} 个问题", 100)
+        
+        print(f"✅ 文档检测完成，共发现 {len(all_issues)} 个问题")
+        return all_issues
     
     async def call_api(self, prompt: str) -> Dict:
         """通用API调用方法"""
-        if self.use_mock:
-            return {"status": "mock", "message": "使用模拟模式"}
-        
         try:
             messages = [HumanMessage(content=prompt)]
             response = await asyncio.to_thread(self.model.invoke, messages)

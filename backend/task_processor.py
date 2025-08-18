@@ -50,24 +50,41 @@ class TaskProcessor:
             chunks = self.split_text(text, 8000)
             print(f"文本分块完成，共{len(chunks)}块")
             
-            # 3. AI检测每个文本块
+            # 3. AI检测每个文本块（支持进度回调）
             all_issues = []
+            
+            # 定义进度回调函数
+            async def update_progress(message: str, progress: int):
+                """更新任务进度和消息"""
+                task.progress = min(progress, 95)  # 留5%给最后的保存步骤
+                task.message = message
+                db.commit()
+                print(f"[进度 {progress}%] {message}")
+            
             for i, chunk in enumerate(chunks):
                 print(f"处理第{i+1}/{len(chunks)}块")
-                issues = await self.ai_service.detect_issues(chunk)
+                
+                # 计算当前块的进度范围
+                base_progress = 20 + (70 * i / len(chunks))
+                chunk_progress_range = 70 / len(chunks)
+                
+                # 创建当前块的进度回调
+                async def chunk_progress_callback(msg: str, pct: int):
+                    """将块内的进度转换为总体进度"""
+                    actual_progress = base_progress + (chunk_progress_range * pct / 100)
+                    await update_progress(f"[块{i+1}/{len(chunks)}] {msg}", int(actual_progress))
+                
+                # 使用进度回调检测问题
+                issues = await self.ai_service.detect_issues(chunk, chunk_progress_callback)
                 
                 # 添加块索引到位置信息
                 for issue in issues:
                     if len(chunks) > 1:
                         issue['location'] = f"第{i+1}部分 - {issue.get('location', '')}"
-                    all_issues.extend(issues)
-                
-                # 更新进度
-                progress = 20 + (70 * (i + 1) / len(chunks))
-                task.progress = progress
-                db.commit()
+                all_issues.extend(issues)
             
             # 4. 保存问题到数据库
+            await update_progress("正在保存检测结果...", 95)
             print(f"检测到{len(all_issues)}个问题")
             for issue_data in all_issues:
                 issue = Issue(
@@ -83,6 +100,7 @@ class TaskProcessor:
             # 5. 完成任务
             task.status = 'completed'
             task.progress = 100
+            task.message = f"文档检测完成，发现 {len(all_issues)} 个问题"
             task.completed_at = datetime.now()
             db.commit()
             
