@@ -1,19 +1,15 @@
-"""AI服务模块 - 使用LangChain调用OpenAI兼容API"""
+"""AI服务模块 - 使用LangChain调用OpenAI兼容API（修复版）"""
 import json
 import os
 import re
 from typing import List, Dict, Optional, Callable
-import yaml
 import asyncio
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 from prompt_loader import prompt_loader
-
-# 加载配置
-with open('config.yaml', 'r', encoding='utf-8') as f:
-    config = yaml.safe_load(f)
+from config_loader import get_ai_service_config
 
 # 定义文档章节模型
 class DocumentSection(BaseModel):
@@ -42,47 +38,24 @@ class DocumentIssues(BaseModel):
 class AIService:
     """AI服务封装 - 使用LangChain和OpenAI兼容API"""
     
-    def _load_config(self):
-        """从配置文件加载AI服务配置"""
-        # 获取AI服务配置
-        ai_config = config.get('ai_service', {})
-        
-        # 获取提供商
-        self.provider = ai_config.get('provider', 'openai')
-        
-        # 根据提供商加载相应配置
-        provider_config = ai_config.get(self.provider, {})
-        default_config = ai_config.get('default', {})
-        
-        # 处理API密钥（支持环境变量）
-        api_key = provider_config.get('api_key', '')
-        if api_key.startswith('${') and api_key.endswith('}'):
-            env_var = api_key[2:-1]
-            api_key = os.getenv(env_var, '')
-        
-        # 处理Base URL（支持环境变量）
-        base_url = provider_config.get('base_url', '')
-        if base_url.startswith('${') and base_url.endswith('}'):
-            env_var = base_url[2:-1]
-            base_url = os.getenv(env_var, '')
-        
-        # 设置配置值（优先使用provider配置，其次使用default配置）
-        self.api_key = api_key or os.getenv('OPENAI_API_KEY', os.getenv('ANTHROPIC_API_KEY', 'dummy-key'))
-        self.api_base = base_url or os.getenv('OPENAI_API_BASE', 'https://api.openai.com/v1')
-        self.model_name = provider_config.get('model', default_config.get('model', 'gpt-4o-mini'))
-        self.temperature = provider_config.get('temperature', default_config.get('temperature', 0.3))
-        self.max_tokens = provider_config.get('max_tokens', default_config.get('max_tokens', 4096))
-        self.timeout = provider_config.get('timeout', default_config.get('timeout', 30))
-        self.max_retries = provider_config.get('max_retries', default_config.get('max_retries', 3))
-        
-        # 降级策略配置
-        self.fallback_config = ai_config.get('fallback', {})
-        self.fallback_enabled = self.fallback_config.get('enabled', False)
-        self.fallback_provider = self.fallback_config.get('provider', None)
-    
     def __init__(self):
-        # 从配置文件加载AI服务配置
-        self._load_config()
+        """初始化AI服务"""
+        # 使用配置加载器获取配置
+        self.config = get_ai_service_config()
+        
+        # 从配置中提取参数
+        self.provider = self.config['provider']
+        self.api_key = self.config['api_key']
+        self.api_base = self.config['base_url']
+        self.model_name = self.config['model']
+        self.temperature = self.config['temperature']
+        self.max_tokens = self.config['max_tokens']
+        self.timeout = self.config['timeout']
+        self.max_retries = self.config['max_retries']
+        
+        # 降级策略
+        self.fallback_enabled = self.config['fallback_enabled']
+        self.fallback_provider = self.config['fallback_provider']
         
         print(f"🤖 AI服务配置:")
         print(f"   Provider: {self.provider}")
@@ -92,7 +65,7 @@ class AIService:
         print(f"   Max Tokens: {self.max_tokens}")
         
         try:
-            # 初始化ChatOpenAI模型（兼容OpenAI和Anthropic）                
+            # 初始化ChatOpenAI模型（兼容OpenAI和Anthropic）
             self.model = ChatOpenAI(
                 api_key=self.api_key,
                 base_url=self.api_base,
@@ -169,7 +142,6 @@ class AIService:
             print(f"❌ 文档预处理失败: {str(e)}")
             # 返回原始文本作为单一章节
             return [{"section_title": "文档内容", "content": text, "level": 1}]
-    
     
     async def detect_issues(self, text: str, progress_callback: Optional[Callable] = None) -> List[Dict]:
         """调用AI检测文档问题 - 使用异步批量处理"""
@@ -253,7 +225,7 @@ class AIService:
                     # 为每个问题添加章节信息
                     issues = result.get('issues', [])
                     for issue in issues:
-                        if 'location' in issue and not section_title in issue['location']:
+                        if 'location' in issue and section_title not in issue.get('location', ''):
                             issue['location'] = f"{section_title} - {issue['location']}"
                     
                     print(f"✓ 章节 '{section_title}' 检测完成，发现 {len(issues)} 个问题")
@@ -301,4 +273,8 @@ class AIService:
             response = await asyncio.to_thread(self.model.invoke, messages)
             return {"status": "success", "content": response.content}
         except Exception as e:
+            # 如果启用了降级策略，可以在这里实现
+            if self.fallback_enabled and self.fallback_provider:
+                print(f"⚠️ 主服务失败，尝试降级到 {self.fallback_provider}")
+                # 这里可以实现降级逻辑
             return {"status": "error", "message": str(e)}
