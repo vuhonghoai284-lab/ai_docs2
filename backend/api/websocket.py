@@ -18,6 +18,8 @@ class ConnectionManager:
     def __init__(self):
         # 存储每个任务的WebSocket连接
         self.active_connections: Dict[str, Set[WebSocket]] = {}
+        # 存储每个WebSocket连接对应的回调函数
+        self.websocket_callbacks: Dict[WebSocket, callable] = {}
     
     async def connect(self, websocket: WebSocket, task_id: str):
         """接受WebSocket连接"""
@@ -38,6 +40,8 @@ class ConnectionManager:
             except:
                 pass  # 连接可能已断开
         
+        # 保存回调函数引用
+        self.websocket_callbacks[websocket] = push_to_client
         logger.add_push_callback(push_to_client)
         
         # 发送历史日志
@@ -55,8 +59,16 @@ class ConnectionManager:
             **status
         })
     
-    def disconnect(self, websocket: WebSocket, task_id: str):
+    async def disconnect(self, websocket: WebSocket, task_id: str):
         """断开WebSocket连接"""
+        # 移除回调函数
+        if websocket in self.websocket_callbacks:
+            callback = self.websocket_callbacks[websocket]
+            logger = await TaskLoggerFactory.get_logger(task_id)
+            logger.remove_push_callback(callback)
+            del self.websocket_callbacks[websocket]
+        
+        # 移除连接
         if task_id in self.active_connections:
             self.active_connections[task_id].discard(websocket)
             
@@ -139,10 +151,10 @@ async def websocket_endpoint(
                 await websocket.send_text("pong")
     
     except WebSocketDisconnect:
-        manager.disconnect(websocket, task_id)
+        await manager.disconnect(websocket, task_id)
     except Exception as e:
         print(f"WebSocket错误: {str(e)}")
-        manager.disconnect(websocket, task_id)
+        await manager.disconnect(websocket, task_id)
 
 
 @router.get("/api/tasks/{task_id}/logs/history")
