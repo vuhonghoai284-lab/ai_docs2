@@ -2,7 +2,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Text, ForeignKey, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 
 # 创建数据库目录
@@ -33,6 +33,7 @@ class Task(Base):
     # 关系
     issues = relationship("Issue", back_populates="task", cascade="all, delete-orphan")
     ai_outputs = relationship("AIOutput", back_populates="task", cascade="all, delete-orphan")
+    logs = relationship("TaskLog", back_populates="task", cascade="all, delete-orphan")
 
 # 检测问题表
 class Issue(Base):
@@ -52,6 +53,24 @@ class Issue(Base):
     
     # 关系
     task = relationship("Task", back_populates="issues")
+
+# 任务日志表
+class TaskLog(Base):
+    """任务日志表"""
+    __tablename__ = "task_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    level = Column(String, nullable=False)  # DEBUG, INFO, WARNING, ERROR, PROGRESS
+    module = Column(String, default="system")
+    stage = Column(String)  # 初始化, 文档解析, 内容分析, 报告生成, 完成, 错误
+    message = Column(Text)
+    progress = Column(Integer, default=0)
+    extra_data = Column(JSON, default={})
+    
+    # 关系
+    task = relationship("Task", back_populates="logs")
 
 # AI模型输出记录表
 class AIOutput(Base):

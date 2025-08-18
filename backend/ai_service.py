@@ -3,6 +3,7 @@ import json
 import os
 import re
 import time
+import logging
 from typing import List, Dict, Optional, Callable
 import asyncio
 from langchain_openai import ChatOpenAI
@@ -61,12 +62,11 @@ class AIService:
         self.fallback_enabled = self.config['fallback_enabled']
         self.fallback_provider = self.config['fallback_provider']
         
-        print(f"🤖 AI服务配置:")
-        print(f"   Provider: {self.provider}")
-        print(f"   API Base: {self.api_base}")
-        print(f"   Model: {self.model_name}")
-        print(f"   Temperature: {self.temperature}")
-        print(f"   Max Tokens: {self.max_tokens}")
+        # 初始化日志
+        self.logger = logging.getLogger(f"ai_service.{id(self)}")
+        self.logger.setLevel(logging.DEBUG)
+        
+        self.logger.info(f"🤖 AI服务配置: Provider={self.provider}, Model={self.model_name}")
         
         try:
             # 初始化ChatOpenAI模型（兼容OpenAI和Anthropic）
@@ -83,15 +83,15 @@ class AIService:
             # 初始化解析器
             self.structure_parser = PydanticOutputParser(pydantic_object=DocumentStructure)
             self.issues_parser = PydanticOutputParser(pydantic_object=DocumentIssues)
-            print("✅ AI服务初始化成功")
+            self.logger.info("✅ AI服务初始化成功")
             
         except Exception as e:
-            print(f"❌ AI服务初始化失败: {str(e)}")
+            self.logger.error(f"❌ AI服务初始化失败: {str(e)}")
             raise
     
     async def preprocess_document(self, text: str, task_id: Optional[int] = None) -> List[Dict]:
         """预处理文档：章节分割和内容整理 - 通过AI一次性完成"""
-        print("📝 开始文档预处理...")
+        self.logger.info("📝 开始文档预处理...")
         start_time = time.time()
         
         try:
@@ -154,11 +154,11 @@ class AIService:
                     self.db.add(ai_output)
                     self.db.commit()
                 
-                print(f"✅ 文档预处理完成，识别到 {len(result.get('sections', []))} 个章节")
+                self.logger.info(f"✅ 文档预处理完成，识别到 {len(result.get('sections', []))} 个章节")
                 return result.get('sections', [])
                 
             except Exception as e:
-                print(f"⚠️ 文档结构解析失败，使用原始文本: {str(e)}")
+                self.logger.warning(f"⚠️ 文档结构解析失败，使用原始文本: {str(e)}")
                 
                 # 保存解析错误信息
                 if self.db and task_id:
@@ -170,7 +170,7 @@ class AIService:
                 return [{"section_title": "文档内容", "content": text, "level": 1}]
                 
         except Exception as e:
-            print(f"❌ 文档预处理失败: {str(e)}")
+            self.logger.error(f"❌ 文档预处理失败: {str(e)}")
             processing_time = time.time() - start_time
             
             # 保存错误信息到数据库
@@ -219,7 +219,7 @@ class AIService:
                 await progress_callback("没有有效的章节需要检测", 100)
             return []
         
-        print(f"📊 准备检测 {len(valid_sections)} 个有效章节")
+        self.logger.info(f"📊 准备检测 {len(valid_sections)} 个有效章节")
         
         # 创建异步检测任务
         async def detect_section_issues(section: Dict, index: int) -> List[Dict]:
@@ -233,7 +233,7 @@ class AIService:
             if progress_callback:
                 await progress_callback(f"正在检测章节 {index + 1}/{len(valid_sections)}: {section_title}", progress)
             
-            print(f"🔍 [{index + 1}/{len(valid_sections)}] 检测章节: {section_title}")
+            self.logger.debug(f"🔍 [{index + 1}/{len(valid_sections)}] 检测章节: {section_title}")
             
             try:
                 # 从模板加载提示词
@@ -296,11 +296,11 @@ class AIService:
                         if 'location' in issue and section_title not in issue.get('location', ''):
                             issue['location'] = f"{section_title} - {issue['location']}"
                     
-                    print(f"✓ 章节 '{section_title}' 检测完成，发现 {len(issues)} 个问题")
+                    self.logger.debug(f"✓ 章节 '{section_title}' 检测完成，发现 {len(issues)} 个问题")
                     return issues
                     
                 except Exception as e:
-                    print(f"⚠️ 解析章节 '{section_title}' 的响应失败: {str(e)}")
+                    self.logger.warning(f"⚠️ 解析章节 '{section_title}' 的响应失败: {str(e)}")
                     
                     # 保存解析错误信息
                     if self.db and task_id:
@@ -312,7 +312,7 @@ class AIService:
                     return []
                     
             except Exception as e:
-                print(f"❌ 检测章节 '{section_title}' 失败: {str(e)}")
+                self.logger.error(f"❌ 检测章节 '{section_title}' 失败: {str(e)}")
                 processing_time = time.time() - section_start_time
                 
                 # 保存错误信息到数据库
@@ -334,7 +334,7 @@ class AIService:
                 return []
         
         # 批量并发执行所有章节的检测
-        print(f"🚀 开始并发检测 {len(valid_sections)} 个章节...")
+        self.logger.info(f"🚀 开始并发检测 {len(valid_sections)} 个章节...")
         
         # 创建所有检测任务
         tasks = [
@@ -351,13 +351,13 @@ class AIService:
             if isinstance(result, list):
                 all_issues.extend(result)
             elif isinstance(result, Exception):
-                print(f"⚠️ 某个章节检测出现异常: {str(result)}")
+                self.logger.warning(f"⚠️ 某个章节检测出现异常: {str(result)}")
         
         # 更新进度：完成
         if progress_callback:
             await progress_callback(f"文档检测完成，共发现 {len(all_issues)} 个问题", 100)
         
-        print(f"✅ 文档检测完成，共发现 {len(all_issues)} 个问题")
+        self.logger.info(f"✅ 文档检测完成，共发现 {len(all_issues)} 个问题")
         return all_issues
     
     async def call_api(self, prompt: str) -> Dict:
@@ -369,6 +369,6 @@ class AIService:
         except Exception as e:
             # 如果启用了降级策略，可以在这里实现
             if self.fallback_enabled and self.fallback_provider:
-                print(f"⚠️ 主服务失败，尝试降级到 {self.fallback_provider}")
+                self.logger.warning(f"⚠️ 主服务失败，尝试降级到 {self.fallback_provider}")
                 # 这里可以实现降级逻辑
             return {"status": "error", "message": str(e)}

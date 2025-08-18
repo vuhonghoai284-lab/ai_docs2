@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Tag, Progress, Space, message, Spin, Empty, Input, Radio, Tabs, Collapse, Typography } from 'antd';
-import { ArrowLeftOutlined, DownloadOutlined, CheckOutlined, CloseOutlined, CodeOutlined, RobotOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, DownloadOutlined, CheckOutlined, CloseOutlined, CodeOutlined, RobotOutlined, HistoryOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { taskAPI } from '../api';
 import { TaskDetail as TaskDetailType, Issue, AIOutput } from '../types';
+import TaskLogs from '../components/TaskLogs';
 
 const { Text, Paragraph } = Typography;
 const { Panel } = Collapse;
@@ -281,35 +282,54 @@ const TaskDetail: React.FC = () => {
             </Card>
           )}
 
-          {/* AI模型输出记录 */}
-          {(task.status === 'completed' || task.status === 'processing') && (
+          {/* AI模型输出记录和实时日志 */}
+          {(task.status === 'completed' || task.status === 'processing' || task.status === 'pending') && (
             <Card 
               size="small" 
-              title={
-                <Space>
-                  <RobotOutlined />
-                  <span>AI模型处理过程</span>
-                </Space>
-              }
-              extra={
-                <Button 
-                  size="small" 
-                  onClick={loadAIOutputs} 
-                  loading={aiOutputsLoading}
-                >
-                  刷新
-                </Button>
-              }
+              title="任务处理详情"
             >
-              {aiOutputsLoading ? (
-                <div style={{ textAlign: 'center', padding: 20 }}>
-                  <Spin />
-                </div>
-              ) : aiOutputs.length === 0 ? (
-                <Empty description="暂无AI处理记录" />
-              ) : (
-                <Tabs defaultActiveKey="preprocess">
-                  <Tabs.TabPane tab="文档预处理" key="preprocess">
+              <Tabs defaultActiveKey={task.status === 'processing' ? 'logs' : 'ai-output'}>
+                {/* 实时日志Tab */}
+                <Tabs.TabPane 
+                  tab={
+                    <Space>
+                      <HistoryOutlined />
+                      <span>实时日志</span>
+                    </Space>
+                  } 
+                  key="logs"
+                >
+                  <TaskLogs taskId={id} taskStatus={task.status} />
+                </Tabs.TabPane>
+
+                {/* AI模型输出Tab */}
+                <Tabs.TabPane 
+                  tab={
+                    <Space>
+                      <RobotOutlined />
+                      <span>AI处理过程</span>
+                      <Button 
+                        size="small" 
+                        type="link" 
+                        onClick={loadAIOutputs} 
+                        loading={aiOutputsLoading}
+                        style={{ padding: 0, height: 'auto' }}
+                      >
+                        刷新
+                      </Button>
+                    </Space>
+                  } 
+                  key="ai-output"
+                >
+                  {aiOutputsLoading ? (
+                    <div style={{ textAlign: 'center', padding: 20 }}>
+                      <Spin />
+                    </div>
+                  ) : aiOutputs.length === 0 ? (
+                    <Empty description="暂无AI处理记录" />
+                  ) : (
+                    <Tabs defaultActiveKey="preprocess">
+                      <Tabs.TabPane tab="文档预处理" key="preprocess">
                     <Collapse>
                       {aiOutputs
                         .filter(output => output.operation_type === 'preprocess')
@@ -482,8 +502,10 @@ const TaskDetail: React.FC = () => {
                         ))}
                     </Collapse>
                   </Tabs.TabPane>
-                </Tabs>
-              )}
+                    </Tabs>
+                  )}
+                </Tabs.TabPane>
+              </Tabs>
             </Card>
           )}
         </Space>

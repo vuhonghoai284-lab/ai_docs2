@@ -14,6 +14,7 @@ import yaml
 from database import get_db, Task, Issue, AIOutput
 from task_processor import task_processor
 from report_generator import generate_report
+from api.websocket import router as websocket_router
 
 # 加载配置
 with open('config.yaml', 'r', encoding='utf-8') as f:
@@ -30,6 +31,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 包含WebSocket路由
+app.include_router(websocket_router)
 
 # 创建必要的目录
 os.makedirs(config['upload_dir'], exist_ok=True)
