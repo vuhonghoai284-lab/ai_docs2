@@ -27,6 +27,9 @@ class Task(Base):
     status = Column(String(20), default="pending")  # pending/processing/completed/failed
     progress = Column(Float, default=0)
     model_index = Column(Integer, default=0)  # 使用的模型索引
+    model_label = Column(String(100), nullable=True)  # 模型显示名称
+    document_chars = Column(Integer, nullable=True)  # 文档总字符数
+    processing_time = Column(Float, nullable=True)  # 处理总耗时（秒）
     created_at = Column(DateTime, default=datetime.now)
     completed_at = Column(DateTime, nullable=True)
     error_message = Column(Text, nullable=True)

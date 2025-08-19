@@ -24,6 +24,8 @@ ai_models:
         model: "gpt-4o-mini"
         temperature: 0.3
         max_tokens: 8000
+        context_window: 128000  # 模型的上下文窗口大小
+        reserved_tokens: 2000    # 预留给系统提示词的tokens
         timeout: 12000
         max_retries: 3
       description: "适合快速处理，成本较低"
@@ -36,6 +38,8 @@ ai_models:
         model: "llama2"
         temperature: 0.3
         max_tokens: 8000
+        context_window: 32000   # 模型的上下文窗口大小
+        reserved_tokens: 2000    # 预留给系统提示词的tokens
         timeout: 12000
         max_retries: 2
       description: "数据不出境，适合敏感文档"
@@ -43,7 +47,7 @@ ai_models:
 # 文件设置  
 file_settings:
   max_file_size: 10485760  # 10MB
-  chunk_size: 8000  # 文本分块大小
+  chunk_size: 8000  # 文本分块大小（废弃，改为从模型配置动态计算）
   allowed_extensions:
     - pdf
     - docx

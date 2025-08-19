@@ -34,10 +34,10 @@ class DocumentIssue(BaseModel):
     severity: str = Field(description="基于用户影响程度的严重等级：致命（导致无法使用或严重误导）/严重（影响核心功能理解）/一般（影响质量但不影响理解）/提示（优化建议）")
     confidence: float = Field(description="模型对此问题判定的置信度，范围0.0-1.0", default=0.8)
     suggestion: str = Field(description="修改建议：直接给出修改后的完整内容，而不是描述如何修改")
-    original_text: str = Field(description="包含问题的原文内容片段", default="")
-    user_impact: str = Field(description="该问题对用户阅读理解的影响", default="")
-    reasoning: str = Field(description="判定为问题的详细分析和推理过程", default="")
-    context: str = Field(description="问题所在的上下文环境", default="")
+    original_text: str = Field(description="包含问题的原文内容关键片段，10~30字符", default="")
+    user_impact: str = Field(description="该问题对用户阅读理解的影响，10~30字符", default="")
+    reasoning: str = Field(description="判定为问题的详细分析和推理过程，20~100字符", default="")
+    context: str = Field(description="包含问题的原文内容的上下文片段内容，长度20~100字符", default="")
 
 class DocumentIssues(BaseModel):
     """文档问题列表"""
@@ -69,6 +69,10 @@ class AIService:
         self.timeout = self.config['timeout']
         self.max_retries = self.config['max_retries']
         
+        # 添加上下文窗口和预留tokens配置
+        self.context_window = self.config.get('context_window', 32000)  # 默认32k
+        self.reserved_tokens = self.config.get('reserved_tokens', 2000)  # 默认预留2000
+        
         # 初始化prompt loader - 支持自定义prompts目录
         if prompts_dir:
             self.prompt_loader = PromptLoader(prompts_dir)
@@ -78,6 +82,14 @@ class AIService:
         # 初始化日志
         self.logger = logging.getLogger(f"ai_service.{id(self)}")
         self.logger.setLevel(logging.DEBUG)
+        
+        # 确保日志能输出到控制台
+        if not self.logger.handlers:
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.DEBUG)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            console_handler.setFormatter(formatter)
+            self.logger.addHandler(console_handler)
         
         self.logger.info(f"🤖 AI服务配置: Provider={self.provider}, Model={self.model_name}")
         
@@ -142,14 +154,36 @@ class AIService:
             # 解析响应
             try:
                 content = response.content
+                self.logger.info(f"📥 收到预处理响应 (耗时: {processing_time:.2f}s)")
+                self.logger.debug(f"原始响应 (前500字符): {str(content)[:500]}")
+                
                 # 尝试解析JSON
                 if isinstance(content, str):
+                    self.logger.debug(f"响应长度: {len(content)} 字符")
+                    
                     # 查找JSON内容
                     json_match = re.search(r'\{.*\}', content, re.DOTALL)
                     if json_match:
                         json_str = json_match.group()
-                        result = json.loads(json_str)
+                        self.logger.debug(f"找到JSON (前200字符): {json_str[:200]}...")
+                        
+                        try:
+                            result = json.loads(json_str)
+                            self.logger.info(f"✅ 预处理JSON解析成功，包含 {len(result.get('sections', []))} 个章节")
+                        except json.JSONDecodeError as je:
+                            self.logger.error(f"❌ 预处理JSON解析失败: {str(je)}")
+                            self.logger.error(f"JSON内容: {json_str[:500]}...")
+                            # 如果没有找到JSON，返回原文作为单一章节
+                            result = {
+                                "sections": [{
+                                    "section_title": "文档内容",
+                                    "content": text,
+                                    "level": 1
+                                }]
+                            }
                     else:
+                        self.logger.warning("⚠️ 预处理响应中未找到JSON格式")
+                        self.logger.debug(f"完整响应: {content[:1000]}...")
                         # 如果没有找到JSON，返回原文作为单一章节
                         result = {
                             "sections": [{
@@ -159,6 +193,7 @@ class AIService:
                             }]
                         }
                 else:
+                    self.logger.warning(f"⚠️ 预处理响应不是字符串: {type(content)}")
                     result = {"sections": [{"section_title": "文档内容", "content": text, "level": 1}]}
                 
                 # 更新数据库中的解析结果
@@ -171,7 +206,10 @@ class AIService:
                 return result.get('sections', [])
                 
             except Exception as e:
-                self.logger.warning(f"⚠️ 文档结构解析失败，使用原始文本: {str(e)}")
+                import traceback
+                self.logger.error(f"⚠️ 文档结构解析失败，使用原始文本: {str(e)}")
+                self.logger.error(f"错误类型: {type(e).__name__}")
+                self.logger.error(f"完整堆栈:\n{traceback.format_exc()}")
                 
                 # 保存解析错误信息
                 if self.db and task_id:
@@ -266,9 +304,19 @@ class AIService:
                     HumanMessage(content=user_prompt)
                 ]
                 
+                # 打印调用信息
+                self.logger.info(f"📤 调用模型检测章节 '{section_title}'")
+                self.logger.debug(f"System Prompt: {system_prompt[:200]}...")
+                self.logger.debug(f"User Prompt: {user_prompt[:200]}...")
+                
                 # 调用模型
                 response = await asyncio.to_thread(self.model.invoke, messages)
                 processing_time = time.time() - section_start_time
+                
+                # 打印原始响应
+                self.logger.info(f"📥 收到模型响应 (耗时: {processing_time:.2f}s)")
+                self.logger.debug(f"原始响应内容 (前500字符): {str(response.content)[:500]}")
+                self.logger.debug(f"响应类型: {type(response.content)}")
                 
                 # 保存AI输出到数据库
                 if self.db and task_id:
@@ -286,15 +334,30 @@ class AIService:
                 # 解析响应
                 try:
                     content = response.content
+                    self.logger.info(f"🔍 开始解析章节 '{section_title}' 的响应")
+                    
                     if isinstance(content, str):
+                        self.logger.debug(f"响应内容长度: {len(content)} 字符")
+                        
                         # 查找JSON内容
                         json_match = re.search(r'\{.*\}', content, re.DOTALL)
                         if json_match:
                             json_str = json_match.group()
-                            result = json.loads(json_str)
+                            self.logger.debug(f"找到JSON内容 (前200字符): {json_str[:200]}...")
+                            
+                            try:
+                                result = json.loads(json_str)
+                                self.logger.info(f"✅ JSON解析成功，包含 {len(result.get('issues', []))} 个问题")
+                            except json.JSONDecodeError as je:
+                                self.logger.error(f"❌ JSON解析失败: {str(je)}")
+                                self.logger.error(f"JSON字符串: {json_str[:500]}...")
+                                result = {"issues": []}
                         else:
+                            self.logger.warning(f"⚠️ 未找到JSON格式内容")
+                            self.logger.debug(f"完整响应: {content[:1000]}...")
                             result = {"issues": []}
                     else:
+                        self.logger.warning(f"⚠️ 响应不是字符串类型: {type(content)}")
                         result = {"issues": []}
                     
                     # 更新数据库中的解析结果
@@ -313,7 +376,10 @@ class AIService:
                     return issues
                     
                 except Exception as e:
-                    self.logger.warning(f"⚠️ 解析章节 '{section_title}' 的响应失败: {str(e)}")
+                    import traceback
+                    self.logger.error(f"⚠️ 解析章节 '{section_title}' 的响应失败: {str(e)}")
+                    self.logger.error(f"错误类型: {type(e).__name__}")
+                    self.logger.error(f"完整堆栈:\n{traceback.format_exc()}")
                     
                     # 保存解析错误信息
                     if self.db and task_id:
@@ -325,7 +391,10 @@ class AIService:
                     return []
                     
             except Exception as e:
+                import traceback
                 self.logger.error(f"❌ 检测章节 '{section_title}' 失败: {str(e)}")
+                self.logger.error(f"错误类型: {type(e).__name__}")
+                self.logger.error(f"完整堆栈:\n{traceback.format_exc()}")
                 processing_time = time.time() - section_start_time
                 
                 # 保存错误信息到数据库

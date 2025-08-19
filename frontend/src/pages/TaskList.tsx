@@ -168,11 +168,26 @@ const TaskList: React.FC = () => {
     failed: tasks.filter(t => t.status === 'failed').length,
   };
 
+  const formatTime = (seconds?: number) => {
+    if (!seconds) return '-';
+    if (seconds < 60) return `${Math.round(seconds)}秒`;
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${minutes}分${secs}秒`;
+  };
+
+  const formatChars = (chars?: number) => {
+    if (!chars) return '-';
+    if (chars < 1000) return `${chars}字`;
+    if (chars < 10000) return `${(chars / 1000).toFixed(1)}千字`;
+    return `${(chars / 10000).toFixed(1)}万字`;
+  };
+
   const columns = [
     {
       title: '文件',
       key: 'file',
-      width: '30%',
+      width: '25%',
       render: (_: any, record: Task) => (
         <Space>
           {getFileIcon(record.file_name)}
@@ -181,15 +196,36 @@ const TaskList: React.FC = () => {
             <Text type="secondary" style={{ fontSize: 12 }}>
               {record.file_name} · {formatFileSize(record.file_size)}
             </Text>
+            {record.document_chars && (
+              <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+                文档: {formatChars(record.document_chars)}
+              </Text>
+            )}
           </div>
         </Space>
+      ),
+    },
+    {
+      title: '模型',
+      key: 'model',
+      width: '12%',
+      render: (_: any, record: Task) => (
+        record.model_label ? (
+          <Tooltip title={record.model_label}>
+            <Tag color="blue" style={{ fontSize: 11 }}>
+              {record.model_label.length > 10 
+                ? record.model_label.substring(0, 10) + '...' 
+                : record.model_label}
+            </Tag>
+          </Tooltip>
+        ) : '-'
       ),
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: '12%',
+      width: '10%',
       render: (status: string) => getStatusTag(status),
       filters: [
         { text: '等待中', value: 'pending' },
@@ -203,12 +239,19 @@ const TaskList: React.FC = () => {
       title: '进度',
       dataIndex: 'progress',
       key: 'progress',
-      width: '15%',
+      width: '12%',
       render: (progress: number, record: Task) => (
         record.status === 'completed' ? (
-          <Space>
-            <CheckCircleOutlined style={{ color: '#52c41a' }} />
-            <Text type="success">完成</Text>
+          <Space direction="vertical" size={0}>
+            <Space size={4}>
+              <CheckCircleOutlined style={{ color: '#52c41a' }} />
+              <Text type="success">完成</Text>
+            </Space>
+            {record.processing_time && (
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                耗时: {formatTime(record.processing_time)}
+              </Text>
+            )}
           </Space>
         ) : record.status === 'failed' ? (
           <Space>
@@ -227,7 +270,7 @@ const TaskList: React.FC = () => {
     {
       title: '问题数',
       key: 'issues',
-      width: '10%',
+      width: '8%',
       render: (_: any, record: Task) => (
         record.status === 'completed' ? (
           <Badge count={record.issue_count || 0} showZero>
@@ -240,7 +283,7 @@ const TaskList: React.FC = () => {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
-      width: '15%',
+      width: '12%',
       render: (date: string) => (
         <Tooltip title={new Date(date).toLocaleString('zh-CN')}>
           <Text style={{ fontSize: 12 }}>
@@ -254,7 +297,7 @@ const TaskList: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: '18%',
+      width: '15%',
       render: (_: any, record: Task) => {
         const menu = (
           <Menu>
@@ -355,14 +398,27 @@ const TaskList: React.FC = () => {
               </Text>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 {formatFileSize(task.file_size)}
+                {task.document_chars && ` · ${formatChars(task.document_chars)}`}
               </Text>
+              {task.model_label && (
+                <Tag color="blue" style={{ fontSize: 10, marginTop: 4 }}>
+                  {task.model_label}
+                </Tag>
+              )}
               {task.status === 'processing' && (
                 <Progress percent={Math.round(task.progress)} size="small" />
               )}
               {task.status === 'completed' && (
-                <Badge count={task.issue_count || 0} showZero>
-                  <Text style={{ fontSize: 12 }}>检测到问题</Text>
-                </Badge>
+                <Space>
+                  <Badge count={task.issue_count || 0} showZero>
+                    <Text style={{ fontSize: 12 }}>检测到问题</Text>
+                  </Badge>
+                  {task.processing_time && (
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      耗时{formatTime(task.processing_time)}
+                    </Text>
+                  )}
+                </Space>
               )}
               <Text type="secondary" style={{ fontSize: 11 }}>
                 {new Date(task.created_at).toLocaleDateString('zh-CN')}

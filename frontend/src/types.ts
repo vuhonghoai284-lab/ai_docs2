@@ -8,6 +8,9 @@ export interface Task {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
   issue_count?: number;  // 新增：问题数量
+  model_label?: string;   // 新增：模型名称
+  document_chars?: number; // 新增：文档字符数
+  processing_time?: number; // 新增：处理耗时(秒)
   created_at: string;
   completed_at?: string;
   error_message?: string;

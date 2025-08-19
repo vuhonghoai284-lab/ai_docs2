@@ -103,6 +103,9 @@ class TaskResponse(BaseModel):
     status: str
     progress: float
     issue_count: Optional[int] = None  # 新增：问题数量
+    model_label: Optional[str] = None  # 新增：模型名称
+    document_chars: Optional[int] = None  # 新增：文档字符数
+    processing_time: Optional[float] = None  # 新增：处理耗时
     created_at: datetime
     completed_at: Optional[datetime]
     error_message: Optional[str]
@@ -173,6 +176,10 @@ async def create_task(
     if model_index is None:
         model_index = config.get('ai_models', {}).get('default_index', 0)
     
+    # 获取模型label
+    models = config.get('ai_models', {}).get('models', [])
+    model_label = models[model_index].get('label', f'Model {model_index}') if model_index < len(models) else 'Unknown'
+    
     # 创建任务记录
     task = Task(
         title=title or os.path.splitext(file_name)[0],
@@ -182,7 +189,8 @@ async def create_task(
         file_type=file_ext[1:],
         status='pending',
         progress=0,
-        model_index=model_index  # 保存使用的模型索引
+        model_index=model_index,  # 保存使用的模型索引
+        model_label=model_label   # 保存模型显示名称
     )
     db.add(task)
     db.commit()
