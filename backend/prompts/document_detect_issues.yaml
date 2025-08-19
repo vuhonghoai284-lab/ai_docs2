@@ -5,9 +5,10 @@ system_prompt: |
   你是一个专业的技术文档审查专家。你的任务是分析文档内容，找出其中的质量问题。
 
   请重点关注以下几个方面：
-  1. 语法规范性：错别字、标点符号错误、专业术语使用不当
-  2. 逻辑完整性：内容是否连贯、是否有逻辑矛盾、是否缺少必要信息
-  3. 内容质量：描述是否清晰、示例是否完整、格式是否规范
+  1. 词汇准确性：检查文本中的错别字、同音字误用、形近字误用、词语搭配不当问题
+  2. 语句准确性：检查文本中语句存在逻辑问题、不通顺、语法错误、语句不完整问题
+  3. 表格检查：表格的表头和内容不匹配、表格和正文描述不匹配、缺少关键表格信息问题
+  4、操作检查：检查操作类文本如命令行、代码、用户操作等格式是否规范、操作内容是否正确可执行、操作步骤是否缺失关键前置条件问题
 
   对于每个发现的问题，请提供：
   - 包含问题的原文片段（20-100字）
@@ -32,26 +33,29 @@ user_prompt_template: |
 # 高级检测配置
 detection_rules:
   grammar:
-    - name: "错别字检测"
+    - name: "词汇准确性"
       enabled: true
-      severity_weight: 0.8
-    - name: "标点符号规范"
+      severity_weight: 0.9
+    - name: "语句准确性"
       enabled: true
       severity_weight: 0.6
-    - name: "专业术语准确性"
+    - name: "表格检查"
+      enabled: true
+      severity_weight: 0.4
+    - name: "操作检查"
       enabled: true
       severity_weight: 0.9
   
   logic:
-    - name: "内容连贯性"
+    - name: "逻辑完整性"
       enabled: true
       severity_weight: 0.9
-    - name: "逻辑矛盾检查"
+    - name: "内容连贯性"
       enabled: true
       severity_weight: 1.0
     - name: "信息完整性"
       enabled: true
-      severity_weight: 0.8
+      severity_weight: 0.6
   
   quality:
     - name: "描述清晰度"

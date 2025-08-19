@@ -62,6 +62,26 @@ app.add_middleware(
 # 包含WebSocket路由
 app.include_router(websocket_router)
 
+# 启动事件处理
+@app.on_event("startup")
+async def startup_event():
+    """系统启动时处理遗留的pending任务"""
+    print("Checking for pending tasks...")
+    db = next(get_db())
+    try:
+        # 查找所有pending状态的任务
+        pending_tasks = db.query(Task).filter(Task.status == 'pending').all()
+        if pending_tasks:
+            print(f"Found {len(pending_tasks)} pending tasks, processing...")
+            for task in pending_tasks:
+                # 使用asyncio创建后台任务
+                asyncio.create_task(process_task_async(task.id))
+                print(f"Started processing task {task.id}: {task.title}")
+        else:
+            print("No pending tasks found")
+    finally:
+        db.close()
+
 # 创建必要的目录
 dirs = config.get('directories', {})
 os.makedirs(dirs.get('upload_dir', './data/uploads'), exist_ok=True)

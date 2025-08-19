@@ -35,8 +35,8 @@ const TaskLogs = ({ taskId, taskStatus }) => {
   useEffect(() => {
     if (!taskId) return;
 
-    // 连接WebSocket
-    logService.connect(taskId);
+    // 连接WebSocket，传递任务状态
+    logService.connect(taskId, taskStatus);
 
     // 设置事件监听器
     const handleLog = (log) => {

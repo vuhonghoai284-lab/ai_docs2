@@ -69,12 +69,6 @@ class ConfigLoader:
                     'model_index': model_index
                 }
                 
-                # 添加降级策略配置
-                fallback_config = config.get('fallback', {})
-                result['fallback_enabled'] = fallback_config.get('enabled', False)
-                result['fallback_strategy'] = fallback_config.get('strategy', 'next')
-                result['fallback_specific_index'] = fallback_config.get('specific_index', 0)
-                
                 return result
         
         # 兼容旧的配置格式
@@ -103,11 +97,6 @@ class ConfigLoader:
             'timeout': int(merged_config.get('timeout', 30)),
             'max_retries': int(merged_config.get('max_retries', 3))
         }
-        
-        # 添加降级策略配置
-        fallback_config = ai_config.get('fallback', {})
-        result['fallback_enabled'] = fallback_config.get('enabled', False)
-        result['fallback_provider'] = fallback_config.get('provider')
         
         return result
 

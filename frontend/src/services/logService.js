@@ -11,15 +11,42 @@ class LogService {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 1000;
+    this.currentTaskId = null; // 当前连接的任务ID
+    this.isConnecting = false; // 是否正在连接
   }
 
   /**
    * 连接到任务日志WebSocket
    * @param {string} taskId - 任务ID
+   * @param {string} taskStatus - 任务状态，如果是completed/failed，优先加载历史日志
    */
-  connect(taskId) {
-    if (this.websocket) {
+  connect(taskId, taskStatus = null) {
+    // 如果已经在连接这个任务，不要重复连接
+    if (this.currentTaskId === taskId && (this.isConnecting || (this.websocket && this.websocket.readyState === WebSocket.OPEN))) {
+      console.log('Already connected or connecting to this task');
+      return;
+    }
+
+    // 如果正在连接其他任务，先断开
+    if (this.currentTaskId !== taskId && this.websocket) {
       this.disconnect();
+    }
+
+    this.currentTaskId = taskId;
+    this.isConnecting = true;
+
+    // 如果任务已完成或失败，优先从API获取历史日志
+    if (taskStatus === 'completed' || taskStatus === 'failed') {
+      console.log('Task is completed/failed, loading history only...');
+      this.fetchHistory(taskId).then(data => {
+        this.isConnecting = false;
+        this.emit('connected', { taskId });
+      }).catch(error => {
+        console.error('Failed to load history:', error);
+        this.isConnecting = false;
+        this.emit('disconnected', { taskId });
+      });
+      return;
     }
 
     const wsUrl = `ws://localhost:8080/ws/task/${taskId}/logs`;
@@ -30,6 +57,7 @@ class LogService {
       this.setupEventHandlers(taskId);
     } catch (error) {
       console.error('WebSocket connection error:', error);
+      this.isConnecting = false;
       this.handleReconnect(taskId);
     }
   }
@@ -44,6 +72,7 @@ class LogService {
     this.websocket.onopen = () => {
       console.log('WebSocket connected');
       this.reconnectAttempts = 0;
+      this.isConnecting = false;
       this.emit('connected', { taskId });
       
       // 启动心跳
@@ -144,6 +173,11 @@ class LogService {
    * 处理重连
    */
   handleReconnect(taskId) {
+    // 如果已经有重连定时器在运行，不要重复创建
+    if (this.reconnectTimer) {
+      return;
+    }
+    
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('Max reconnection attempts reached');
       this.emit('reconnect_failed', { taskId });
@@ -161,6 +195,7 @@ class LogService {
     });
 
     this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null; // 清除定时器引用
       this.connect(taskId);
     }, delay);
   }
@@ -200,6 +235,8 @@ class LogService {
     }
 
     this.reconnectAttempts = 0;
+    this.currentTaskId = null;
+    this.isConnecting = false;
   }
 
   /**

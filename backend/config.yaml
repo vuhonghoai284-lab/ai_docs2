@@ -1,7 +1,7 @@
 # 服务器配置
 server:
   host: "0.0.0.0"  # 监听地址
-  port: 8124  # 监听端口
+  port: 8080  # 监听端口
   debug: false  # 调试模式
   reload: false  # 自动重载
   workers: 1  # 工作进程数
@@ -75,12 +75,6 @@ ai_models:
         timeout: 120
         max_retries: 2
       description: "数据不出境，适合敏感文档"
-
-# 降级策略
-fallback:
-  enabled: true  # 是否启用降级
-  strategy: "next"  # 降级策略: next(下一个模型), specific(指定模型)
-  specific_index: 2  # 当strategy为specific时，降级到的模型索引
 
 # 文件设置  
 file_settings:

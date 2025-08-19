@@ -339,49 +339,7 @@ const TaskDetailEnhanced: React.FC = () => {
                             </div>
                           </div>
                         </Col>
-                        <Col span={8}>
-                          <div className="stat-section">
-                            <Text type="secondary">问题级别分布</Text>
-                            <div className="severity-bars">
-                              <div className="bar-item">
-                                <Text>致命</Text>
-                                <Progress 
-                                  percent={totalIssues ? Math.round((severityCounts['致命'] / totalIssues) * 100) : 0} 
-                                  size="small"
-                                  strokeColor="#ff4d4f"
-                                  format={() => severityCounts['致命']}
-                                />
-                              </div>
-                              <div className="bar-item">
-                                <Text>严重</Text>
-                                <Progress 
-                                  percent={totalIssues ? Math.round((severityCounts['严重'] / totalIssues) * 100) : 0}
-                                  size="small"
-                                  strokeColor="#faad14"
-                                  format={() => severityCounts['严重']}
-                                />
-                              </div>
-                              <div className="bar-item">
-                                <Text>一般</Text>
-                                <Progress 
-                                  percent={totalIssues ? Math.round((severityCounts['一般'] / totalIssues) * 100) : 0}
-                                  size="small"
-                                  strokeColor="#1890ff"
-                                  format={() => severityCounts['一般']}
-                                />
-                              </div>
-                              <div className="bar-item">
-                                <Text>提示</Text>
-                                <Progress 
-                                  percent={totalIssues ? Math.round((severityCounts['提示'] / totalIssues) * 100) : 0}
-                                  size="small"
-                                  strokeColor="#52c41a"
-                                  format={() => severityCounts['提示']}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </Col>
+
                         <Col span={8}>
                           <div className="stat-section">
                             <Text type="secondary">接受率</Text>

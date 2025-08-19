@@ -1,6 +1,5 @@
 """AI服务模块 - 使用LangChain调用OpenAI兼容API（修复版）"""
 import json
-import os
 import re
 import time
 import logging
@@ -61,10 +60,6 @@ class AIService:
         self.max_tokens = self.config['max_tokens']
         self.timeout = self.config['timeout']
         self.max_retries = self.config['max_retries']
-        
-        # 降级策略
-        self.fallback_enabled = self.config['fallback_enabled']
-        self.fallback_provider = self.config['fallback_provider']
         
         # 初始化日志
         self.logger = logging.getLogger(f"ai_service.{id(self)}")
