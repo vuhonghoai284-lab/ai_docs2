@@ -7,6 +7,7 @@ export interface Task {
   file_type: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
+  issue_count?: number;  // 新增：问题数量
   created_at: string;
   completed_at?: string;
   error_message?: string;
