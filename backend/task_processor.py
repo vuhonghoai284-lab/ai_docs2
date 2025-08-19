@@ -35,8 +35,18 @@ class TaskProcessor:
             await logger.error(f"任务不存在: {task_id}")
             return
         
+        # 确保model_index不为None，使用默认值0
+        model_index = task.model_index if task.model_index is not None else 0
+        await logger.info(f"使用模型索引: {model_index} (原值: {task.model_index})")
+        
+        # 如果数据库中的model_index为None，更新为默认值
+        if task.model_index is None:
+            task.model_index = 0
+            db.commit()
+            await logger.info(f"已将任务 {task_id} 的model_index更新为默认值0")
+        
         # 初始化AI服务，传入数据库会话和模型索引
-        self.ai_service = AIService(db_session=db, model_index=task.model_index)
+        self.ai_service = AIService(db_session=db, model_index=model_index)
         
         # 更新状态为处理中
         task.status = 'processing'
