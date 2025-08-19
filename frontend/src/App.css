@@ -40,17 +40,40 @@
   margin-bottom: 16px;
 }
 
-.severity-high {
+.severity-fatal {
   color: #ff4d4f;
   font-weight: bold;
 }
 
-.severity-medium {
-  color: #faad14;
+.severity-critical {
+  color: #fa8c16;
   font-weight: bold;
 }
 
-.severity-low {
+.severity-normal {
+  color: #1890ff;
+  font-weight: bold;
+}
+
+.severity-info {
   color: #52c41a;
   font-weight: bold;
+}
+
+/* 突出显示问题描述 */
+.issue-description {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  line-height: 1.6;
+  padding: 8px 12px;
+  background: linear-gradient(to right, #f0f5ff 0%, transparent 100%);
+  border-left: 3px solid #1890ff;
+  margin: 8px 0;
+  border-radius: 4px;
+}
+
+.issue-description:hover {
+  background: #f0f5ff;
+  transition: background 0.3s ease;
 }

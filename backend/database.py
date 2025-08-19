@@ -45,7 +45,8 @@ class Issue(Base):
     issue_type = Column(String(50))  # 语法/逻辑/完整性
     description = Column(Text)
     location = Column(String(200))
-    severity = Column(String(20))  # 高/中/低
+    severity = Column(String(20))  # 致命/严重/一般/提示
+    confidence = Column(Float, nullable=True)  # 模型置信度 (0.0-1.0)
     suggestion = Column(Text)
     
     # 新增字段：更详细的问题信息

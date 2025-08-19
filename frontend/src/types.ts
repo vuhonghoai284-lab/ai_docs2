@@ -18,6 +18,7 @@ export interface Issue {
   description: string;
   location: string;
   severity: string;
+  confidence?: number;        // 新增：模型置信度 (0.0-1.0)
   suggestion: string;
   original_text?: string;    // 新增：原文内容
   user_impact?: string;       // 新增：对用户的影响
