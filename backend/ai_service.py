@@ -28,12 +28,12 @@ class DocumentStructure(BaseModel):
 # 定义结构化输出模型
 class DocumentIssue(BaseModel):
     """文档问题模型"""
-    type: str = Field(description="问题类型：语法/逻辑/内容")
-    description: str = Field(description="具体问题描述")
+    type: str = Field(description="问题类型：2-6个字的简短描述，如'错别字'、'语法错误'、'逻辑不通'、'内容缺失'、'格式问题'等，由模型根据实际问题自行判断")
+    description: str = Field(description="详细的问题描述，清晰说明具体问题点，包括问题的表现、位置和影响，至少30字以上")
     location: str = Field(description="问题所在位置")
     severity: str = Field(description="基于用户影响程度的严重等级：致命（导致无法使用或严重误导）/严重（影响核心功能理解）/一般（影响质量但不影响理解）/提示（优化建议）")
     confidence: float = Field(description="模型对此问题判定的置信度，范围0.0-1.0", default=0.8)
-    suggestion: str = Field(description="改进建议")
+    suggestion: str = Field(description="修改建议：直接给出修改后的完整内容，而不是描述如何修改")
     original_text: str = Field(description="包含问题的原文内容片段", default="")
     user_impact: str = Field(description="该问题对用户阅读理解的影响", default="")
     reasoning: str = Field(description="判定为问题的详细分析和推理过程", default="")

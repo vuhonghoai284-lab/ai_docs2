@@ -62,18 +62,48 @@
 
 /* 突出显示问题描述 */
 .issue-description {
-  font-size: 16px;
-  font-weight: 600;
-  color: #262626;
-  line-height: 1.6;
-  padding: 8px 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #141414;
+  line-height: 1.8;
+  padding: 12px 16px;
   background: linear-gradient(to right, #f0f5ff 0%, transparent 100%);
-  border-left: 3px solid #1890ff;
-  margin: 8px 0;
+  border-left: 4px solid #1890ff;
+  margin: 12px 0;
   border-radius: 4px;
+  display: block;
 }
 
 .issue-description:hover {
   background: #f0f5ff;
   transition: background 0.3s ease;
+}
+
+/* 问题卡片标题样式 */
+.issue-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.issue-card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.issue-card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 用户操作按钮样式 */
+.issue-feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
 }
