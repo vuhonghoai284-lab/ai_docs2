@@ -34,6 +34,10 @@ class DocumentIssue(BaseModel):
     location: str = Field(description="问题所在位置")
     severity: str = Field(description="严重程度：高/中/低")
     suggestion: str = Field(description="改进建议")
+    original_text: str = Field(description="包含问题的原文内容片段", default="")
+    user_impact: str = Field(description="该问题对用户阅读理解的影响", default="")
+    reasoning: str = Field(description="判定为问题的详细分析和推理过程", default="")
+    context: str = Field(description="问题所在的上下文环境", default="")
 
 class DocumentIssues(BaseModel):
     """文档问题列表"""

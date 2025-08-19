@@ -4,7 +4,7 @@ import { Layout, Menu } from 'antd';
 import { FileAddOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import TaskCreate from './pages/TaskCreate';
 import TaskList from './pages/TaskList';
-import TaskDetail from './pages/TaskDetail';
+import TaskDetailEnhanced from './pages/TaskDetailEnhanced';
 import './App.css';
 
 const { Header, Content } = Layout;
@@ -30,7 +30,7 @@ function App() {
           <Routes>
             <Route path="/" element={<TaskList />} />
             <Route path="/create" element={<TaskCreate />} />
-            <Route path="/task/:id" element={<TaskDetail />} />
+            <Route path="/task/:id" element={<TaskDetailEnhanced />} />
           </Routes>
         </Content>
       </Layout>

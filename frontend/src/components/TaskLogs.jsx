@@ -29,6 +29,7 @@ const TaskLogs = ({ taskId, taskStatus }) => {
   const [autoScroll, setAutoScroll] = useState(true);
   const logsEndRef = useRef(null);
   const logsContainerRef = useRef(null);
+  const logIdsRef = useRef(new Set()); // 用于跟踪已添加的日志ID，避免重复
 
   // 连接WebSocket并设置监听器
   useEffect(() => {
@@ -39,7 +40,14 @@ const TaskLogs = ({ taskId, taskStatus }) => {
 
     // 设置事件监听器
     const handleLog = (log) => {
-      setLogs(prev => [...prev, log]);
+      // 生成唯一ID（基于时间戳和消息内容）
+      const logId = `${log.timestamp}_${log.level}_${log.message}`;
+      
+      // 避免重复添加
+      if (!logIdsRef.current.has(logId)) {
+        logIdsRef.current.add(logId);
+        setLogs(prev => [...prev, { ...log, id: logId }]);
+      }
     };
 
     const handleStatus = (status) => {
@@ -76,7 +84,17 @@ const TaskLogs = ({ taskId, taskStatus }) => {
     // 获取历史日志
     logService.fetchHistory(taskId).then(data => {
       if (data.logs) {
-        setLogs(data.logs);
+        // 清空之前的日志ID集合
+        logIdsRef.current.clear();
+        
+        // 为历史日志添加ID并记录
+        const logsWithId = data.logs.map(log => {
+          const logId = `${log.timestamp}_${log.level}_${log.message}`;
+          logIdsRef.current.add(logId);
+          return { ...log, id: logId };
+        });
+        
+        setLogs(logsWithId);
       }
       if (data.current_status) {
         setCurrentStatus(data.current_status);
@@ -164,6 +182,7 @@ const TaskLogs = ({ taskId, taskStatus }) => {
   // 清除日志
   const handleClearLogs = () => {
     setLogs([]);
+    logIdsRef.current.clear();
     logService.clearLogs(taskId);
   };
 
@@ -274,8 +293,8 @@ const TaskLogs = ({ taskId, taskStatus }) => {
           {filteredLogs.length === 0 ? (
             <Empty description="暂无日志" />
           ) : (
-            filteredLogs.map((log, index) => (
-              <div key={index} className={`log-item log-level-${log.level.toLowerCase()}`}>
+            filteredLogs.map((log) => (
+              <div key={log.id || `${log.timestamp}_${log.level}`} className={`log-item log-level-${log.level.toLowerCase()}`}>
                 <span className="log-time">{formatTimestamp(log.timestamp)}</span>
                 <Tag color={getLevelColor(log.level)} className="log-level">
                   {log.level}

@@ -177,6 +177,10 @@ def get_task_detail(task_id: int, db: Session = Depends(get_db)):
                 "location": issue.location,
                 "severity": issue.severity,
                 "suggestion": issue.suggestion,
+                "original_text": issue.original_text,
+                "user_impact": issue.user_impact,
+                "reasoning": issue.reasoning,
+                "context": issue.context,
                 "feedback_type": issue.feedback_type,
                 "feedback_comment": issue.feedback_comment
             }

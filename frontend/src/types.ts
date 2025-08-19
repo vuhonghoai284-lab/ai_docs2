@@ -19,6 +19,10 @@ export interface Issue {
   location: string;
   severity: string;
   suggestion: string;
+  original_text?: string;    // 新增：原文内容
+  user_impact?: string;       // 新增：对用户的影响
+  reasoning?: string;         // 新增：判定原因
+  context?: string;           // 新增：上下文
   feedback_type?: 'accept' | 'reject';
   feedback_comment?: string;
 }
