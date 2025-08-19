@@ -46,6 +46,13 @@ class Issue(Base):
     location = Column(String(200))
     severity = Column(String(20))  # 高/中/低
     suggestion = Column(Text)
+    
+    # 新增字段：更详细的问题信息
+    original_text = Column(Text, nullable=True)  # 原文内容
+    user_impact = Column(Text, nullable=True)  # 对用户的影响
+    reasoning = Column(Text, nullable=True)  # 判定问题的思考原因
+    context = Column(Text, nullable=True)  # 上下文信息
+    
     feedback_type = Column(String(20), nullable=True)  # accept/reject/null
     feedback_comment = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
