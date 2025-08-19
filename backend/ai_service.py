@@ -46,11 +46,11 @@ class DocumentIssues(BaseModel):
 class AIService:
     """AI服务封装 - 使用LangChain和OpenAI兼容API"""
     
-    def __init__(self, db_session: Optional[Session] = None):
+    def __init__(self, db_session: Optional[Session] = None, model_index: Optional[int] = None):
         """初始化AI服务"""
         self.db = db_session
         # 使用配置加载器获取配置
-        self.config = get_ai_service_config()
+        self.config = get_ai_service_config(model_index)
         
         # 从配置中提取参数
         self.provider = self.config['provider']

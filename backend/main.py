@@ -1,11 +1,13 @@
 """FastAPI主应用"""
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, BackgroundTasks, Form
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 import os
+import sys
+import argparse
 import shutil
 from datetime import datetime
 import asyncio
@@ -16,28 +18,56 @@ from task_processor import task_processor
 from report_generator import generate_report
 from api.websocket import router as websocket_router
 
+# 解析命令行参数
+parser = argparse.ArgumentParser(description='AI文档测试系统后端')
+parser.add_argument('--config', '-c', type=str, default='config.yaml', help='配置文件路径')
+args, unknown = parser.parse_known_args()
+
 # 加载配置
-with open('config.yaml', 'r', encoding='utf-8') as f:
+config_path = args.config
+if not os.path.exists(config_path):
+    print(f"Error: Config file not found: {config_path}")
+    sys.exit(1)
+
+with open(config_path, 'r', encoding='utf-8') as f:
     config = yaml.safe_load(f)
+
+# 处理环境变量替换
+def resolve_env_vars(obj):
+    """Recursively resolve environment variables in config"""
+    if isinstance(obj, dict):
+        return {k: resolve_env_vars(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [resolve_env_vars(item) for item in obj]
+    elif isinstance(obj, str) and obj.startswith('${') and obj.endswith('}'):
+        env_var = obj[2:-1]
+        return os.environ.get(env_var, obj)
+    return obj
+
+config = resolve_env_vars(config)
 
 # 创建应用
 app = FastAPI(title="AI文档测试系统")
 
 # CORS配置
+cors_config = config.get('cors', {})
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 允许所有源，生产环境应限制
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=cors_config.get('origins', ["*"]),
+    allow_credentials=cors_config.get('allow_credentials', True),
+    allow_methods=cors_config.get('allow_methods', ["*"]),
+    allow_headers=cors_config.get('allow_headers', ["*"]),
 )
 
 # 包含WebSocket路由
 app.include_router(websocket_router)
 
 # 创建必要的目录
-os.makedirs(config['upload_dir'], exist_ok=True)
-os.makedirs(config['report_dir'], exist_ok=True)
+dirs = config.get('directories', {})
+os.makedirs(dirs.get('upload_dir', './data/uploads'), exist_ok=True)
+os.makedirs(dirs.get('report_dir', './data/reports'), exist_ok=True)
+os.makedirs(dirs.get('log_dir', './data/logs'), exist_ok=True)
+os.makedirs(dirs.get('temp_dir', './data/temp'), exist_ok=True)
 
 # Pydantic模型
 class FeedbackRequest(BaseModel):
@@ -91,28 +121,36 @@ async def create_task(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     title: Optional[str] = None,
+    model_index: Optional[int] = Form(None),
     db: Session = Depends(get_db)
 ):
     """创建任务"""
     # 验证文件类型
-    allowed_types = ['.pdf', '.docx', '.md']
+    file_settings = config.get('file_settings', {})
+    allowed_exts = ['.' + ext for ext in file_settings.get('allowed_extensions', ['pdf', 'docx', 'md'])]
     file_ext = os.path.splitext(file.filename)[1].lower()
-    if file_ext not in allowed_types:
+    if file_ext not in allowed_exts:
         raise HTTPException(400, f"不支持的文件类型: {file_ext}")
     
     # 验证文件大小
     file_size = 0
     content = await file.read()
     file_size = len(content)
-    if file_size > config['max_file_size']:
+    max_size = file_settings.get('max_file_size', 10485760)
+    if file_size > max_size:
         raise HTTPException(400, f"文件大小超过限制: {file_size / 1024 / 1024:.2f}MB")
     
     # 保存文件
     file_name = file.filename
-    file_path = os.path.join(config['upload_dir'], f"{datetime.now().timestamp()}_{file_name}")
+    upload_dir = config.get('directories', {}).get('upload_dir', './data/uploads')
+    file_path = os.path.join(upload_dir, f"{datetime.now().timestamp()}_{file_name}")
     
     with open(file_path, 'wb') as f:
         f.write(content)
+    
+    # 获取选择的模型索引
+    if model_index is None:
+        model_index = config.get('ai_models', {}).get('default_index', 0)
     
     # 创建任务记录
     task = Task(
@@ -122,7 +160,8 @@ async def create_task(
         file_size=file_size,
         file_type=file_ext[1:],
         status='pending',
-        progress=0
+        progress=0,
+        model_index=model_index  # 保存使用的模型索引
     )
     db.add(task)
     db.commit()
@@ -274,6 +313,45 @@ def get_ai_output_detail(output_id: int, db: Session = Depends(get_db)):
     
     return ai_output
 
+# 新增API: 获取可用模型列表
+@app.get("/api/models")
+def get_available_models():
+    """获取可用的AI模型列表"""
+    models = config.get('ai_models', {}).get('models', [])
+    default_index = config.get('ai_models', {}).get('default_index', 0)
+    
+    model_list = []
+    for i, model in enumerate(models):
+        model_list.append({
+            'index': i,
+            'label': model.get('label', f'Model {i}'),
+            'description': model.get('description', ''),
+            'provider': model.get('provider', 'unknown'),
+            'is_default': i == default_index
+        })
+    
+    return {'models': model_list, 'default_index': default_index}
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    
+    # 从配置文件读取服务器设置
+    server_config = config.get('server', {})
+    host = server_config.get('host', '0.0.0.0')
+    port = server_config.get('port', 8080)
+    debug = server_config.get('debug', False)
+    reload = server_config.get('reload', False)
+    workers = server_config.get('workers', 1)
+    
+    print(f"Starting server on {host}:{port}")
+    print(f"Config file: {config_path}")
+    print(f"Available models: {len(config.get('ai_models', {}).get('models', []))}")
+    
+    uvicorn.run(
+        "main:app" if reload else app,
+        host=host,
+        port=port,
+        reload=reload,
+        workers=1 if reload else workers,
+        log_level="debug" if debug else "info"
+    )

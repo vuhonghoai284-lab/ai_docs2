@@ -13,11 +13,14 @@ const api = axios.create({
 
 export const taskAPI = {
   // 创建任务
-  createTask: async (file: File, title?: string) => {
+  createTask: async (file: File, title?: string, modelIndex?: number) => {
     const formData = new FormData();
     formData.append('file', file);
     if (title) {
       formData.append('title', title);
+    }
+    if (modelIndex !== undefined) {
+      formData.append('model_index', modelIndex.toString());
     }
     
     const response = await api.post<Task>('/tasks', formData, {

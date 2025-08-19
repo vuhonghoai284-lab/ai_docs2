@@ -29,14 +29,14 @@ class TaskProcessor:
         # 获取日志管理器
         logger = await TaskLoggerFactory.get_logger(str(task_id), "task_processor")
         
-        # 初始化AI服务，传入数据库会话
-        self.ai_service = AIService(db_session=db)
-        
-        # 获取任务
+        # 获取任务配置的模型索引并初始化AI服务
         task = db.query(Task).filter(Task.id == task_id).first()
         if not task:
             await logger.error(f"任务不存在: {task_id}")
             return
+        
+        # 初始化AI服务，传入数据库会话和模型索引
+        self.ai_service = AIService(db_session=db, model_index=task.model_index)
         
         # 更新状态为处理中
         task.status = 'processing'
@@ -103,7 +103,12 @@ class TaskProcessor:
                     description=issue_data.get('description', ''),
                     location=issue_data.get('location', ''),
                     severity=issue_data.get('severity', '中'),
-                    suggestion=issue_data.get('suggestion', '')
+                    suggestion=issue_data.get('suggestion', ''),
+                    # 新增字段
+                    original_text=issue_data.get('original_text', ''),
+                    user_impact=issue_data.get('user_impact', ''),
+                    reasoning=issue_data.get('reasoning', ''),
+                    context=issue_data.get('context', '')
                 )
                 db.add(issue)
             

@@ -26,6 +26,7 @@ class Task(Base):
     file_type = Column(String(20))
     status = Column(String(20), default="pending")  # pending/processing/completed/failed
     progress = Column(Float, default=0)
+    model_index = Column(Integer, default=0)  # 使用的模型索引
     created_at = Column(DateTime, default=datetime.now)
     completed_at = Column(DateTime, nullable=True)
     error_message = Column(Text, nullable=True)
