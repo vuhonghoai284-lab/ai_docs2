@@ -173,12 +173,19 @@ async def create_task(
         f.write(content)
     
     # 获取选择的模型索引
+    print(f"[DEBUG main.py] 接收到的model_index: {model_index}, 类型: {type(model_index)}")
     if model_index is None:
         model_index = config.get('ai_models', {}).get('default_index', 0)
+        print(f"[DEBUG main.py] model_index为None，使用默认值: {model_index}")
+    else:
+        # 确保model_index是整数
+        model_index = int(model_index)
+        print(f"[DEBUG main.py] 转换后的model_index: {model_index}")
     
     # 获取模型label
     models = config.get('ai_models', {}).get('models', [])
     model_label = models[model_index].get('label', f'Model {model_index}') if model_index < len(models) else 'Unknown'
+    print(f"[DEBUG] 选择的模型: index={model_index}, label={model_label}")
     
     # 创建任务记录
     task = Task(

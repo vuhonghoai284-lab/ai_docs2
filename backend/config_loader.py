@@ -44,12 +44,18 @@ class ConfigLoader:
             # 使用指定的模型索引或默认索引
             if model_index is None:
                 model_index = models_config.get('default_index', 0)
+                print(f"[DEBUG ConfigLoader] model_index为None，使用默认索引: {model_index}")
+            else:
+                print(f"[DEBUG ConfigLoader] 使用指定的model_index: {model_index}")
             
             # 确保索引有效
             if 0 <= model_index < len(models):
                 model_config = models[model_index]
                 provider = model_config.get('provider', 'openai')
                 inner_config = model_config.get('config', {})
+                
+                print(f"[DEBUG ConfigLoader] 选择模型配置 - 索引: {model_index}, 标签: {model_config.get('label')}, 提供商: {provider}")
+                print(f"[DEBUG ConfigLoader] 模型名称: {inner_config.get('model')}, API地址: {inner_config.get('base_url')}")
                 
                 # 解析环境变量
                 resolved_config = {}
@@ -65,6 +71,8 @@ class ConfigLoader:
                     'max_tokens': int(resolved_config.get('max_tokens', 4096)),
                     'timeout': int(resolved_config.get('timeout', 30)),
                     'max_retries': int(resolved_config.get('max_retries', 3)),
+                    'context_window': int(resolved_config.get('context_window', 32000)),
+                    'reserved_tokens': int(resolved_config.get('reserved_tokens', 2000)),
                     'model_label': model_config.get('label', f'Model {model_index}'),
                     'model_index': model_index
                 }

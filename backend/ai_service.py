@@ -59,6 +59,10 @@ class AIService:
         # 使用配置加载器获取配置，支持自定义配置文件路径
         self.config = get_ai_service_config(model_index, config_path)
         
+        # 添加详细的调试日志
+        print(f"[DEBUG AIService] 初始化模型 - model_index: {model_index}")
+        print(f"[DEBUG AIService] 配置详情: model_label={self.config.get('model_label')}, model_index={self.config.get('model_index')}")
+        
         # 从配置中提取参数
         self.provider = self.config['provider']
         self.api_key = self.config['api_key']
@@ -68,6 +72,10 @@ class AIService:
         self.max_tokens = self.config['max_tokens']
         self.timeout = self.config['timeout']
         self.max_retries = self.config['max_retries']
+        
+        # 打印API配置详情（隐藏敏感信息）
+        print(f"[DEBUG AIService] API配置: provider={self.provider}, base_url={self.api_base}, model={self.model_name}")
+        print(f"[DEBUG AIService] API Key长度: {len(self.api_key) if self.api_key else 0}")
         
         # 添加上下文窗口和预留tokens配置
         self.context_window = self.config.get('context_window', 32000)  # 默认32k

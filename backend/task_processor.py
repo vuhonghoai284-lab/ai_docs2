@@ -55,9 +55,13 @@ class TaskProcessor:
             await logger.error(f"任务不存在: {task_id}")
             return
         
+        # 调试：打印从数据库读取的值
+        print(f"[DEBUG task_processor] 任务 {task_id}: 数据库中的model_index={task.model_index}, 类型={type(task.model_index)}")
+        
         # 确保model_index不为None，使用默认值0
         model_index = task.model_index if task.model_index is not None else 0
-        await logger.info(f"使用模型索引: {model_index} (原值: {task.model_index})")
+        print(f"[DEBUG task_processor] 处理后的model_index={model_index}, 类型={type(model_index)}")
+        await logger.info(f"🤖 使用模型索引: {model_index} (数据库值: {task.model_index}, 模型名称: {task.model_label})")
         
         # 如果数据库中的model_index为None，更新为默认值
         if task.model_index is None:
@@ -65,15 +69,16 @@ class TaskProcessor:
             db.commit()
             await logger.info(f"已将任务 {task_id} 的model_index更新为默认值0")
         
-        # 初始化AI服务，传入数据库会话和模型索引
-        self.ai_service = AIService(db_session=db, model_index=model_index)
-        
-        # 更新状态为处理中
-        task.status = 'processing'
-        task.progress = 0
-        db.commit()
-        
         try:
+            # 初始化AI服务，传入数据库会话和模型索引
+            await logger.info(f"正在初始化AI服务，模型索引: {model_index}")
+            self.ai_service = AIService(db_session=db, model_index=model_index)
+            await logger.info(f"✅ AI服务初始化成功")
+            
+            # 更新状态为处理中
+            task.status = 'processing'
+            task.progress = 0
+            db.commit()
             # 1. 解析文件
             await logger.set_stage(TaskStage.PARSING, f"开始解析文件: {task.file_path}")
             text = self.file_parser.parse(task.file_path)
@@ -161,10 +166,19 @@ class TaskProcessor:
             
         except Exception as e:
             # 处理失败
-            await logger.set_stage(TaskStage.ERROR, f"任务{task_id}处理失败: {str(e)}")
+            import traceback
+            error_details = traceback.format_exc()
+            await logger.error(f"任务{task_id}处理失败: {str(e)}")
+            await logger.error(f"错误堆栈:\n{error_details}")
+            await logger.set_stage(TaskStage.ERROR, f"任务处理失败: {str(e)}")
+            
+            # 更新任务状态为失败
             task.status = 'failed'
             task.error_message = str(e)
+            task.progress = 0
+            task.processing_time = time.time() - start_time
             db.commit()
+            
             await TaskLoggerFactory.close_logger(str(task_id))
 
 # 全局任务处理器实例

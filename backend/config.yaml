@@ -30,19 +30,19 @@ ai_models:
         max_retries: 3
       description: "适合快速处理，成本较低"
       
-    - label: "本地模型 (私有部署)"  # 前端显示名称
-      provider: "custom"
+    - label: "GPT-3.5 Turbo (备用)"  # 前端显示名称
+      provider: "openai"
       config:
-        api_key: "not-needed"
-        base_url: "http://localhost:11434/v1"  # 例如 Ollama API
-        model: "llama2"
-        temperature: 0.3
-        max_tokens: 8000
-        context_window: 32000   # 模型的上下文窗口大小
-        reserved_tokens: 2000    # 预留给系统提示词的tokens
-        timeout: 12000
+        api_key: ${OPENAI_API_KEY}
+        base_url: "https://api.openai.com/v1"
+        model: "gpt-3.5-turbo"
+        temperature: 0.5
+        max_tokens: 4096
+        context_window: 16000   # 模型的上下文窗口大小
+        reserved_tokens: 1500    # 预留给系统提示词的tokens
+        timeout: 30
         max_retries: 2
-      description: "数据不出境，适合敏感文档"
+      description: "备用模型，成本和性能平衡"
 
 # 文件设置  
 file_settings:
