@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
-from prompt_loader import prompt_loader
+from prompt_loader import prompt_loader, PromptLoader
 from config_loader import get_ai_service_config
 from sqlalchemy.orm import Session
 from database import AIOutput
@@ -31,7 +31,8 @@ class DocumentIssue(BaseModel):
     type: str = Field(description="问题类型：语法/逻辑/内容")
     description: str = Field(description="具体问题描述")
     location: str = Field(description="问题所在位置")
-    severity: str = Field(description="严重程度：高/中/低")
+    severity: str = Field(description="基于用户影响程度的严重等级：致命（导致无法使用或严重误导）/严重（影响核心功能理解）/一般（影响质量但不影响理解）/提示（优化建议）")
+    confidence: float = Field(description="模型对此问题判定的置信度，范围0.0-1.0", default=0.8)
     suggestion: str = Field(description="改进建议")
     original_text: str = Field(description="包含问题的原文内容片段", default="")
     user_impact: str = Field(description="该问题对用户阅读理解的影响", default="")
@@ -45,11 +46,18 @@ class DocumentIssues(BaseModel):
 class AIService:
     """AI服务封装 - 使用LangChain和OpenAI兼容API"""
     
-    def __init__(self, db_session: Optional[Session] = None, model_index: Optional[int] = None):
-        """初始化AI服务"""
+    def __init__(self, db_session: Optional[Session] = None, model_index: Optional[int] = None, config_path: Optional[str] = None, prompts_dir: Optional[str] = None):
+        """初始化AI服务
+        
+        Args:
+            db_session: 数据库会话
+            model_index: 模型索引
+            config_path: 配置文件路径，如果不指定则使用默认的config.yaml
+            prompts_dir: 提示词模板目录路径，如果不指定则使用默认的prompts目录
+        """
         self.db = db_session
-        # 使用配置加载器获取配置
-        self.config = get_ai_service_config(model_index)
+        # 使用配置加载器获取配置，支持自定义配置文件路径
+        self.config = get_ai_service_config(model_index, config_path)
         
         # 从配置中提取参数
         self.provider = self.config['provider']
@@ -60,6 +68,12 @@ class AIService:
         self.max_tokens = self.config['max_tokens']
         self.timeout = self.config['timeout']
         self.max_retries = self.config['max_retries']
+        
+        # 初始化prompt loader - 支持自定义prompts目录
+        if prompts_dir:
+            self.prompt_loader = PromptLoader(prompts_dir)
+        else:
+            self.prompt_loader = prompt_loader  # 使用默认的全局实例
         
         # 初始化日志
         self.logger = logging.getLogger(f"ai_service.{id(self)}")
@@ -95,10 +109,10 @@ class AIService:
         
         try:
             # 从模板加载提示词
-            system_prompt = prompt_loader.get_system_prompt('document_preprocess')
+            system_prompt = self.prompt_loader.get_system_prompt('document_preprocess')
             
             # 构建用户提示
-            user_prompt = prompt_loader.get_user_prompt(
+            user_prompt = self.prompt_loader.get_user_prompt(
                 'document_preprocess',
                 format_instructions=self.structure_parser.get_format_instructions(),
                 document_content=text[:10000]  # 限制长度以避免超出token限制
@@ -236,10 +250,10 @@ class AIService:
             
             try:
                 # 从模板加载提示词
-                system_prompt = prompt_loader.get_system_prompt('document_detect_issues')
+                system_prompt = self.prompt_loader.get_system_prompt('document_detect_issues')
                 
                 # 构建用户提示
-                user_prompt = prompt_loader.get_user_prompt(
+                user_prompt = self.prompt_loader.get_user_prompt(
                     'document_detect_issues',
                     section_title=section_title,
                     format_instructions=self.issues_parser.get_format_instructions(),
@@ -367,7 +381,7 @@ class AIService:
             return {"status": "success", "content": response.content}
         except Exception as e:
             # 如果启用了降级策略，可以在这里实现
-            if self.fallback_enabled and self.fallback_provider:
+            if hasattr(self, 'fallback_enabled') and self.fallback_enabled and hasattr(self, 'fallback_provider'):
                 self.logger.warning(f"⚠️ 主服务失败，尝试降级到 {self.fallback_provider}")
                 # 这里可以实现降级逻辑
             return {"status": "error", "message": str(e)}

@@ -112,7 +112,8 @@ class TaskProcessor:
                     issue_type=issue_data.get('type', '未知'),
                     description=issue_data.get('description', ''),
                     location=issue_data.get('location', ''),
-                    severity=issue_data.get('severity', '中'),
+                    severity=issue_data.get('severity', '一般'),
+                    confidence=issue_data.get('confidence', 0.8),  # 添加置信度字段
                     suggestion=issue_data.get('suggestion', ''),
                     # 新增字段
                     original_text=issue_data.get('original_text', ''),

@@ -94,13 +94,15 @@ const TaskDetail: React.FC = () => {
   };
 
   const getSeverityClass = (severity: string) => {
-    switch (severity.toLowerCase()) {
-      case '高':
-        return 'severity-high';
-      case '中':
-        return 'severity-medium';
-      case '低':
-        return 'severity-low';
+    switch (severity) {
+      case '致命':
+        return 'severity-fatal';
+      case '严重':
+        return 'severity-critical';
+      case '一般':
+        return 'severity-normal';
+      case '提示':
+        return 'severity-info';
       default:
         return '';
     }
@@ -199,6 +201,11 @@ const TaskDetail: React.FC = () => {
                           <span className={getSeverityClass(issue.severity)}>
                             严重程度：{issue.severity}
                           </span>
+                          {issue.confidence && (
+                            <Tag color="purple">
+                              置信度：{(issue.confidence * 100).toFixed(0)}%
+                            </Tag>
+                          )}
                         </Space>
                       }
                       extra={
@@ -212,7 +219,7 @@ const TaskDetail: React.FC = () => {
                       <Space direction="vertical" style={{ width: '100%' }}>
                         <div>
                           <strong>问题描述：</strong>
-                          <p style={{ margin: '8px 0' }}>{issue.description}</p>
+                          <p className="issue-description">{issue.description}</p>
                         </div>
                         <div>
                           <strong>位置：</strong> {issue.location}

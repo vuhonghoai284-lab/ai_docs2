@@ -102,12 +102,17 @@ class ConfigLoader:
 
 
 # 全局配置实例
-def get_config() -> Dict[str, Any]:
+def get_config(config_path: str = 'config.yaml') -> Dict[str, Any]:
     """获取全局配置"""
-    return ConfigLoader.load_config()
+    return ConfigLoader.load_config(config_path)
 
 
-def get_ai_service_config(model_index: Optional[int] = None) -> Dict[str, Any]:
-    """获取AI服务配置"""
-    config = get_config()
+def get_ai_service_config(model_index: Optional[int] = None, config_path: Optional[str] = None) -> Dict[str, Any]:
+    """获取AI服务配置
+    
+    Args:
+        model_index: 模型索引
+        config_path: 配置文件路径，如果不指定则使用默认的config.yaml
+    """
+    config = get_config(config_path) if config_path else get_config()
     return ConfigLoader.get_ai_config(config, model_index)
