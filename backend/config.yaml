@@ -1,47 +1,132 @@
+# 服务器配置
+server:
+  host: "0.0.0.0"  # 监听地址
+  port: 8124  # 监听端口
+  debug: false  # 调试模式
+  reload: false  # 自动重载
+  workers: 1  # 工作进程数
+
 # 数据库
 database: ./data/app.db
 
-# AI服务配置
-ai_service:
-  # 模型提供商：openai, anthropic, azure, custom
-  provider: "openai"
+# AI模型配置 - 支持多模型
+ai_models:
+  # 默认使用的模型索引（从0开始）
+  default_index: 0
   
-  # OpenAI配置
-  openai:
-    api_key: "${OPENAI_API_KEY}"  # 从环境变量获取，或直接填写
-    base_url: "https://api.openai.com/v1"  # API端点，可自定义
-    model: "gpt-4o-mini"  # 使用的模型
-    temperature: 0.3  # 温度参数，控制创造性
-    max_tokens: 4096  # 最大token数
-    timeout: 30  # 请求超时时间（秒）
-    max_retries: 3  # 最大重试次数
-    
-  # Anthropic配置（备选）
-  anthropic:
-    api_key: "${ANTHROPIC_API_KEY}"  # 从环境变量获取
-    base_url: "${ANTHROPIC_BASE_URL}"  # 自定义端点
-    model: "claude-3-haiku-20240307"  # 使用的模型
-    temperature: 0.3
-    max_tokens: 4096
-    timeout: 30
-    max_retries: 3
-    
-  # 通用配置
-  default:
-    temperature: 0.3
-    max_tokens: 4096
-    timeout: 30
-    max_retries: 3
-    
-  # 降级策略
-  fallback:
-    enabled: true  # 是否启用降级
-    provider: "anthropic"  # 降级到的提供商
-    
-# 文件设置  
-max_file_size: 10485760  # 10MB
-chunk_size: 8000
+  # 模型列表
+  models:
+    - label: "GPT-4o Mini (快速)"  # 前端显示名称
+      provider: "openai"
+      config:
+        api_key: "${OPENAI_API_KEY}"  # 从环境变量获取
+        base_url: "https://api.openai.com/v1"
+        model: "gpt-4o-mini"
+        temperature: 0.3
+        max_tokens: 4096
+        timeout: 30
+        max_retries: 3
+      description: "适合快速处理，成本较低"
+      
+    - label: "GPT-4 Turbo (精准)"  # 前端显示名称
+      provider: "openai"
+      config:
+        api_key: "${OPENAI_API_KEY}"
+        base_url: "https://api.openai.com/v1"
+        model: "gpt-4-turbo-preview"
+        temperature: 0.2
+        max_tokens: 8192
+        timeout: 60
+        max_retries: 3
+      description: "更高精度，适合复杂文档"
+      
+    - label: "Claude 3 Haiku (高效)"  # 前端显示名称
+      provider: "anthropic"
+      config:
+        api_key: "${ANTHROPIC_API_KEY}"
+        base_url: "${ANTHROPIC_BASE_URL}"
+        model: "claude-3-haiku-20240307"
+        temperature: 0.3
+        max_tokens: 4096
+        timeout: 30
+        max_retries: 3
+      description: "平衡速度和质量"
+      
+    - label: "Claude 3 Sonnet (专业)"  # 前端显示名称
+      provider: "anthropic"
+      config:
+        api_key: "${ANTHROPIC_API_KEY}"
+        base_url: "${ANTHROPIC_BASE_URL}"
+        model: "claude-3-sonnet-20240229"
+        temperature: 0.2
+        max_tokens: 8192
+        timeout: 60
+        max_retries: 3
+      description: "专业级分析，适合技术文档"
+      
+    - label: "本地模型 (私有部署)"  # 前端显示名称
+      provider: "custom"
+      config:
+        api_key: "not-needed"
+        base_url: "http://localhost:11434/v1"  # 例如 Ollama API
+        model: "llama2"
+        temperature: 0.3
+        max_tokens: 4096
+        timeout: 120
+        max_retries: 2
+      description: "数据不出境，适合敏感文档"
 
-# 目录
-upload_dir: ./data/uploads
-report_dir: ./data/reports
+# 降级策略
+fallback:
+  enabled: true  # 是否启用降级
+  strategy: "next"  # 降级策略: next(下一个模型), specific(指定模型)
+  specific_index: 2  # 当strategy为specific时，降级到的模型索引
+
+# 文件设置  
+file_settings:
+  max_file_size: 10485760  # 10MB
+  chunk_size: 8000  # 文本分块大小
+  allowed_extensions:
+    - pdf
+    - docx
+    - md
+    - txt
+
+# 目录配置
+directories:
+  upload_dir: ./data/uploads
+  report_dir: ./data/reports
+  log_dir: ./data/logs
+  temp_dir: ./data/temp
+
+# 日志配置
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./data/logs/app.log"
+  max_size: 10485760  # 10MB
+  backup_count: 5
+
+# 任务处理配置
+task_processing:
+  max_concurrent_tasks: 3  # 最大并发任务数
+  task_timeout: 3600  # 任务超时时间（秒）
+  retry_failed_tasks: true  # 是否重试失败的任务
+  
+# CORS配置
+cors:
+  enabled: true
+  origins:
+    - "http://localhost:3000"
+    - "http://localhost:3001"
+    - "http://localhost:3002"
+    - "http://localhost:3003"
+  allow_credentials: true
+  allow_methods: ["*"]
+  allow_headers: ["*"]
+
+# 环境变量映射（可选）
+env_mapping:
+  OPENAI_API_KEY: "OPENAI_API_KEY"
+  ANTHROPIC_API_KEY: "ANTHROPIC_AUTH_TOKEN"
+  ANTHROPIC_BASE_URL: "ANTHROPIC_BASE_URL"
