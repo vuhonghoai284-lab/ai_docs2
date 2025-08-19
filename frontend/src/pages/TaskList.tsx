@@ -1,13 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Tag, Progress, Space, message, Popconfirm } from 'antd';
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
+import { 
+  Card, Table, Button, Tag, Progress, Space, message, Popconfirm, 
+  Badge, Tooltip, Dropdown, Menu, Input, Select, Row, Col, Statistic,
+  Empty, Typography, Segmented
+} from 'antd';
+import { 
+  PlusOutlined, ReloadOutlined, DeleteOutlined, EyeOutlined,
+  DownloadOutlined, FileTextOutlined, FilePdfOutlined, FileWordOutlined,
+  FileMarkdownOutlined, FileUnknownOutlined, SearchOutlined,
+  FilterOutlined, CheckCircleOutlined, CloseCircleOutlined,
+  ClockCircleOutlined, SyncOutlined, ExclamationCircleOutlined,
+  BarChartOutlined
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { taskAPI } from '../api';
 import { Task } from '../types';
 
+const { Text } = Typography;
+const { Option } = Select;
+
 const TaskList: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const navigate = useNavigate();
 
   const loadTasks = async () => {
@@ -15,6 +34,7 @@ const TaskList: React.FC = () => {
     try {
       const data = await taskAPI.getTasks();
       setTasks(data);
+      filterTasks(data, searchText, statusFilter);
     } catch (error) {
       message.error('加载任务列表失败');
     }
@@ -23,10 +43,33 @@ const TaskList: React.FC = () => {
 
   useEffect(() => {
     loadTasks();
-    // 每2秒刷新一次，获取进度更新
-    const interval = setInterval(loadTasks, 2000);
+    // 每5秒刷新一次，获取进度更新（减少频率）
+    const interval = setInterval(loadTasks, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    filterTasks(tasks, searchText, statusFilter);
+  }, [tasks, searchText, statusFilter]);
+
+  const filterTasks = (taskList: Task[], search: string, status: string) => {
+    let filtered = [...taskList];
+    
+    // 搜索过滤
+    if (search) {
+      filtered = filtered.filter(task => 
+        task.title?.toLowerCase().includes(search.toLowerCase()) ||
+        task.file_name.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    
+    // 状态过滤
+    if (status !== 'all') {
+      filtered = filtered.filter(task => task.status === status);
+    }
+    
+    setFilteredTasks(filtered);
+  };
 
   const handleDelete = async (taskId: number) => {
     try {
@@ -38,15 +81,74 @@ const TaskList: React.FC = () => {
     }
   };
 
+  const handleBatchDelete = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请选择要删除的任务');
+      return;
+    }
+    
+    try {
+      // 批量删除（需要后端支持）
+      for (const taskId of selectedRowKeys) {
+        await taskAPI.deleteTask(Number(taskId));
+      }
+      message.success(`成功删除 ${selectedRowKeys.length} 个任务`);
+      setSelectedRowKeys([]);
+      loadTasks();
+    } catch (error) {
+      message.error('批量删除失败');
+    }
+  };
+
+  const handleRetry = async (taskId: number) => {
+    try {
+      await taskAPI.retryTask(taskId);
+      message.success('任务已重新启动');
+      loadTasks();
+    } catch (error) {
+      message.error('重试失败');
+    }
+  };
+
+  const handleDownloadReport = async (taskId: number) => {
+    try {
+      await taskAPI.downloadReport(taskId);
+      message.success('报告下载成功');
+    } catch (error) {
+      message.error('下载报告失败');
+    }
+  };
+
   const getStatusTag = (status: string) => {
-    const statusMap: { [key: string]: { color: string; text: string } } = {
-      pending: { color: 'default', text: '等待中' },
-      processing: { color: 'processing', text: '处理中' },
-      completed: { color: 'success', text: '已完成' },
-      failed: { color: 'error', text: '失败' },
+    const statusMap: { [key: string]: { color: string; text: string; icon: React.ReactNode } } = {
+      pending: { color: 'default', text: '等待中', icon: <ClockCircleOutlined /> },
+      processing: { color: 'processing', text: '处理中', icon: <SyncOutlined spin /> },
+      completed: { color: 'success', text: '已完成', icon: <CheckCircleOutlined /> },
+      failed: { color: 'error', text: '失败', icon: <CloseCircleOutlined /> },
     };
     const config = statusMap[status] || statusMap.pending;
-    return <Tag color={config.color}>{config.text}</Tag>;
+    return (
+      <Tag color={config.color} icon={config.icon}>
+        {config.text}
+      </Tag>
+    );
+  };
+
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'pdf':
+        return <FilePdfOutlined style={{ color: '#ff4d4f', fontSize: 16 }} />;
+      case 'doc':
+      case 'docx':
+        return <FileWordOutlined style={{ color: '#1890ff', fontSize: 16 }} />;
+      case 'md':
+        return <FileMarkdownOutlined style={{ color: '#52c41a', fontSize: 16 }} />;
+      case 'txt':
+        return <FileTextOutlined style={{ color: '#722ed1', fontSize: 16 }} />;
+      default:
+        return <FileUnknownOutlined style={{ color: '#8c8c8c', fontSize: 16 }} />;
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -57,32 +159,45 @@ const TaskList: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // 计算统计数据
+  const statistics = {
+    total: tasks.length,
+    pending: tasks.filter(t => t.status === 'pending').length,
+    processing: tasks.filter(t => t.status === 'processing').length,
+    completed: tasks.filter(t => t.status === 'completed').length,
+    failed: tasks.filter(t => t.status === 'failed').length,
+  };
+
   const columns = [
     {
-      title: '任务标题',
-      dataIndex: 'title',
-      key: 'title',
-      width: '25%',
-    },
-    {
-      title: '文件名',
-      dataIndex: 'file_name',
-      key: 'file_name',
-      width: '20%',
-    },
-    {
-      title: '文件大小',
-      dataIndex: 'file_size',
-      key: 'file_size',
-      width: '10%',
-      render: (size: number) => formatFileSize(size),
+      title: '文件',
+      key: 'file',
+      width: '30%',
+      render: (_: any, record: Task) => (
+        <Space>
+          {getFileIcon(record.file_name)}
+          <div>
+            <div style={{ fontWeight: 500 }}>{record.title || record.file_name}</div>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {record.file_name} · {formatFileSize(record.file_size)}
+            </Text>
+          </div>
+        </Space>
+      ),
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: '10%',
+      width: '12%',
       render: (status: string) => getStatusTag(status),
+      filters: [
+        { text: '等待中', value: 'pending' },
+        { text: '处理中', value: 'processing' },
+        { text: '已完成', value: 'completed' },
+        { text: '失败', value: 'failed' },
+      ],
+      onFilter: (value: any, record: Task) => record.status === value,
     },
     {
       title: '进度',
@@ -90,83 +205,351 @@ const TaskList: React.FC = () => {
       key: 'progress',
       width: '15%',
       render: (progress: number, record: Task) => (
-        <Progress 
-          percent={Math.round(progress)} 
-          size="small"
-          status={record.status === 'failed' ? 'exception' : undefined}
-        />
+        record.status === 'completed' ? (
+          <Space>
+            <CheckCircleOutlined style={{ color: '#52c41a' }} />
+            <Text type="success">完成</Text>
+          </Space>
+        ) : record.status === 'failed' ? (
+          <Space>
+            <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+            <Text type="danger">失败</Text>
+          </Space>
+        ) : (
+          <Progress 
+            percent={Math.round(progress)} 
+            size="small"
+            status={record.status === 'failed' ? 'exception' : undefined}
+          />
+        )
+      ),
+    },
+    {
+      title: '问题数',
+      key: 'issues',
+      width: '10%',
+      render: (_: any, record: Task) => (
+        record.status === 'completed' ? (
+          <Badge count={record.issue_count || 0} showZero>
+            <ExclamationCircleOutlined style={{ fontSize: 16 }} />
+          </Badge>
+        ) : '-'
       ),
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
-      width: '12%',
-      render: (date: string) => new Date(date).toLocaleString('zh-CN'),
+      width: '15%',
+      render: (date: string) => (
+        <Tooltip title={new Date(date).toLocaleString('zh-CN')}>
+          <Text style={{ fontSize: 12 }}>
+            {new Date(date).toLocaleDateString('zh-CN')}
+          </Text>
+        </Tooltip>
+      ),
+      sorter: (a: Task, b: Task) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
     },
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: Task) => (
-        <Space size="small">
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => navigate(`/task/${record.id}`)}
-          >
-            查看
-          </Button>
-          <Popconfirm
-            title="确定删除该任务吗？"
-            onConfirm={() => handleDelete(record.id)}
-            okText="确定"
-            cancelText="取消"
-          >
+      width: '18%',
+      render: (_: any, record: Task) => {
+        const menu = (
+          <Menu>
+            <Menu.Item key="view" icon={<EyeOutlined />} onClick={() => navigate(`/task/${record.id}`)}>
+              查看详情
+            </Menu.Item>
+            {record.status === 'completed' && (
+              <Menu.Item key="download" icon={<DownloadOutlined />} onClick={() => handleDownloadReport(record.id)}>
+                下载报告
+              </Menu.Item>
+            )}
+            {record.status === 'failed' && (
+              <Menu.Item key="retry" icon={<ReloadOutlined />} onClick={() => handleRetry(record.id)}>
+                重试任务
+              </Menu.Item>
+            )}
+            <Menu.Divider />
+            <Menu.Item key="delete" icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)}>
+              删除任务
+            </Menu.Item>
+          </Menu>
+        );
+
+        return (
+          <Space size="small">
             <Button
-              type="link"
+              type="primary"
               size="small"
-              danger
-              icon={<DeleteOutlined />}
+              ghost
+              icon={<EyeOutlined />}
+              onClick={() => navigate(`/task/${record.id}`)}
             >
-              删除
+              查看
             </Button>
-          </Popconfirm>
-        </Space>
-      ),
+            <Dropdown overlay={menu} trigger={['click']}>
+              <Button size="small">
+                更多 <FilterOutlined />
+              </Button>
+            </Dropdown>
+          </Space>
+        );
+      },
     },
   ];
 
-  return (
-    <Card
-      title="任务列表"
-      extra={
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={loadTasks}>
-            刷新
-          </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => navigate('/create')}
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (newSelectedRowKeys: React.Key[]) => {
+      setSelectedRowKeys(newSelectedRowKeys);
+    },
+  };
+
+  const renderTaskCard = (task: Task) => (
+    <Col xs={24} sm={12} md={8} lg={6} key={task.id}>
+      <Card
+        hoverable
+        size="small"
+        style={{ marginBottom: 16 }}
+        actions={[
+          <Tooltip title="查看详情">
+            <EyeOutlined onClick={() => navigate(`/task/${task.id}`)} />
+          </Tooltip>,
+          task.status === 'completed' ? (
+            <Tooltip title="下载报告">
+              <DownloadOutlined onClick={() => handleDownloadReport(task.id)} />
+            </Tooltip>
+          ) : task.status === 'failed' ? (
+            <Tooltip title="重试">
+              <ReloadOutlined onClick={() => handleRetry(task.id)} />
+            </Tooltip>
+          ) : (
+            <BarChartOutlined style={{ color: '#d9d9d9' }} />
+          ),
+          <Popconfirm
+            title="确定删除该任务吗？"
+            onConfirm={() => handleDelete(task.id)}
+            okText="确定"
+            cancelText="取消"
           >
-            新建任务
-          </Button>
-        </Space>
-      }
-    >
-      <Table
-        columns={columns}
-        dataSource={tasks}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          pageSize: 10,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条记录`,
-        }}
-      />
-    </Card>
+            <DeleteOutlined style={{ color: '#ff4d4f' }} />
+          </Popconfirm>,
+        ]}
+      >
+        <Card.Meta
+          avatar={getFileIcon(task.file_name)}
+          title={
+            <div style={{ fontSize: 14 }}>
+              {task.title || task.file_name}
+              <div style={{ marginTop: 4 }}>
+                {getStatusTag(task.status)}
+              </div>
+            </div>
+          }
+          description={
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {task.file_name}
+              </Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {formatFileSize(task.file_size)}
+              </Text>
+              {task.status === 'processing' && (
+                <Progress percent={Math.round(task.progress)} size="small" />
+              )}
+              {task.status === 'completed' && (
+                <Badge count={task.issue_count || 0} showZero>
+                  <Text style={{ fontSize: 12 }}>检测到问题</Text>
+                </Badge>
+              )}
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                {new Date(task.created_at).toLocaleDateString('zh-CN')}
+              </Text>
+            </Space>
+          }
+        />
+      </Card>
+    </Col>
+  );
+
+  return (
+    <Space direction="vertical" style={{ width: '100%' }} size="large">
+      {/* 统计卡片 */}
+      <Row gutter={16}>
+        <Col xs={24} sm={12} md={4}>
+          <Card size="small">
+            <Statistic
+              title="总任务数"
+              value={statistics.total}
+              prefix={<FileTextOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={5}>
+          <Card size="small">
+            <Statistic
+              title="等待中"
+              value={statistics.pending}
+              prefix={<ClockCircleOutlined />}
+              valueStyle={{ color: '#8c8c8c' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={5}>
+          <Card size="small">
+            <Statistic
+              title="处理中"
+              value={statistics.processing}
+              prefix={<SyncOutlined spin />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={5}>
+          <Card size="small">
+            <Statistic
+              title="已完成"
+              value={statistics.completed}
+              prefix={<CheckCircleOutlined />}
+              valueStyle={{ color: '#52c41a' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={5}>
+          <Card size="small">
+            <Statistic
+              title="失败"
+              value={statistics.failed}
+              prefix={<CloseCircleOutlined />}
+              valueStyle={{ color: '#ff4d4f' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 主内容卡片 */}
+      <Card
+        title={
+          <Space>
+            <span>任务管理</span>
+            <Badge count={statistics.processing} dot={statistics.processing > 0}>
+              <span style={{ fontSize: 14, color: '#8c8c8c' }}>
+                {statistics.processing > 0 && `(${statistics.processing} 个进行中)`}
+              </span>
+            </Badge>
+          </Space>
+        }
+        extra={
+          <Space>
+            <Segmented
+              options={[
+                { value: 'table', icon: <FilterOutlined /> },
+                { value: 'card', icon: <BarChartOutlined /> },
+              ]}
+              value={viewMode}
+              onChange={(value) => setViewMode(value as 'table' | 'card')}
+            />
+            <Button icon={<ReloadOutlined />} onClick={loadTasks}>
+              刷新
+            </Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => navigate('/create')}
+            >
+              新建任务
+            </Button>
+          </Space>
+        }
+      >
+        {/* 搜索和筛选栏 */}
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col xs={24} sm={12} md={8}>
+            <Input
+              placeholder="搜索文件名或标题..."
+              prefix={<SearchOutlined />}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              allowClear
+            />
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="状态筛选"
+              value={statusFilter}
+              onChange={setStatusFilter}
+            >
+              <Option value="all">全部状态</Option>
+              <Option value="pending">等待中</Option>
+              <Option value="processing">处理中</Option>
+              <Option value="completed">已完成</Option>
+              <Option value="failed">失败</Option>
+            </Select>
+          </Col>
+          {selectedRowKeys.length > 0 && (
+            <Col xs={24} sm={12} md={10}>
+              <Space>
+                <Text>已选择 {selectedRowKeys.length} 项</Text>
+                <Popconfirm
+                  title={`确定删除选中的 ${selectedRowKeys.length} 个任务吗？`}
+                  onConfirm={handleBatchDelete}
+                  okText="确定"
+                  cancelText="取消"
+                >
+                  <Button danger size="small" icon={<DeleteOutlined />}>
+                    批量删除
+                  </Button>
+                </Popconfirm>
+                <Button size="small" onClick={() => setSelectedRowKeys([])}>
+                  取消选择
+                </Button>
+              </Space>
+            </Col>
+          )}
+        </Row>
+
+        {/* 任务列表/卡片视图 */}
+        {viewMode === 'table' ? (
+          <Table
+            rowSelection={rowSelection}
+            columns={columns}
+            dataSource={filteredTasks}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              showTotal: (total) => `共 ${total} 条记录`,
+              showQuickJumper: true,
+            }}
+            locale={{
+              emptyText: (
+                <Empty
+                  description={searchText || statusFilter !== 'all' ? '没有符合条件的任务' : '暂无任务'}
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                />
+              ),
+            }}
+          />
+        ) : (
+          <Row gutter={[16, 16]}>
+            {filteredTasks.length > 0 ? (
+              filteredTasks.map(task => renderTaskCard(task))
+            ) : (
+              <Col span={24}>
+                <Empty
+                  description={searchText || statusFilter !== 'all' ? '没有符合条件的任务' : '暂无任务'}
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                />
+              </Col>
+            )}
+          </Row>
+        )}
+      </Card>
+    </Space>
   );
 };
 

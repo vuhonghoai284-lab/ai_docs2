@@ -102,6 +102,7 @@ class TaskResponse(BaseModel):
     file_type: str
     status: str
     progress: float
+    issue_count: Optional[int] = None  # 新增：问题数量
     created_at: datetime
     completed_at: Optional[datetime]
     error_message: Optional[str]
@@ -204,6 +205,9 @@ async def process_task_async(task_id: int):
 def get_tasks(db: Session = Depends(get_db)):
     """获取任务列表"""
     tasks = db.query(Task).order_by(Task.created_at.desc()).all()
+    # 为每个任务添加问题数量
+    for task in tasks:
+        task.issue_count = db.query(Issue).filter(Issue.task_id == task.id).count()
     return tasks
 
 @app.get("/api/tasks/{task_id}")

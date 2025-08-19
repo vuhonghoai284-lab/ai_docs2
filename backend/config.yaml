@@ -23,46 +23,10 @@ ai_models:
         base_url: "https://api.openai.com/v1"
         model: "gpt-4o-mini"
         temperature: 0.3
-        max_tokens: 4096
-        timeout: 30
+        max_tokens: 8000
+        timeout: 12000
         max_retries: 3
       description: "适合快速处理，成本较低"
-      
-    - label: "GPT-4 Turbo (精准)"  # 前端显示名称
-      provider: "openai"
-      config:
-        api_key: "${OPENAI_API_KEY}"
-        base_url: "https://api.openai.com/v1"
-        model: "gpt-4-turbo-preview"
-        temperature: 0.2
-        max_tokens: 8192
-        timeout: 60
-        max_retries: 3
-      description: "更高精度，适合复杂文档"
-      
-    - label: "Claude 3 Haiku (高效)"  # 前端显示名称
-      provider: "anthropic"
-      config:
-        api_key: "${ANTHROPIC_API_KEY}"
-        base_url: "${ANTHROPIC_BASE_URL}"
-        model: "claude-3-haiku-20240307"
-        temperature: 0.3
-        max_tokens: 4096
-        timeout: 30
-        max_retries: 3
-      description: "平衡速度和质量"
-      
-    - label: "Claude 3 Sonnet (专业)"  # 前端显示名称
-      provider: "anthropic"
-      config:
-        api_key: "${ANTHROPIC_API_KEY}"
-        base_url: "${ANTHROPIC_BASE_URL}"
-        model: "claude-3-sonnet-20240229"
-        temperature: 0.2
-        max_tokens: 8192
-        timeout: 60
-        max_retries: 3
-      description: "专业级分析，适合技术文档"
       
     - label: "本地模型 (私有部署)"  # 前端显示名称
       provider: "custom"
@@ -71,8 +35,8 @@ ai_models:
         base_url: "http://localhost:11434/v1"  # 例如 Ollama API
         model: "llama2"
         temperature: 0.3
-        max_tokens: 4096
-        timeout: 120
+        max_tokens: 8000
+        timeout: 12000
         max_retries: 2
       description: "数据不出境，适合敏感文档"
 
@@ -104,7 +68,7 @@ logging:
 # 任务处理配置
 task_processing:
   max_concurrent_tasks: 3  # 最大并发任务数
-  task_timeout: 3600  # 任务超时时间（秒）
+  task_timeout: 12000  # 任务超时时间（秒）
   retry_failed_tasks: true  # 是否重试失败的任务
   
 # CORS配置

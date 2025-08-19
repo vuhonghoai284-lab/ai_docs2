@@ -1,43 +1,55 @@
 /**
- * 任务日志服务 - WebSocket连接和日志管理
+ * WebSocket日志服务
+ * 管理任务日志的WebSocket连接和实时更新
  */
-
 class LogService {
   constructor() {
     this.websocket = null;
-    this.listeners = new Map(); // 存储各种事件的监听器
-    this.logs = new Map(); // 存储任务日志
-    this.reconnectTimer = null;
+    this.currentTaskId = null;
+    this.logs = new Map(); // 缓存各任务的日志
+    this.listeners = new Map(); // 事件监听器
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
-    this.reconnectDelay = 1000;
-    this.currentTaskId = null; // 当前连接的任务ID
-    this.isConnecting = false; // 是否正在连接
+    this.reconnectDelay = 1000; // 初始重连延迟(ms)
+    this.heartbeatTimer = null;
+    this.heartbeatTimeout = null;
+    this.reconnectTimer = null;
+    this.isConnecting = false;
+    this.shouldReconnect = true; // 是否应该自动重连
+    this.connectionClosed = false; // 标记连接是否被主动关闭
   }
 
   /**
-   * 连接到任务日志WebSocket
-   * @param {string} taskId - 任务ID
-   * @param {string} taskStatus - 任务状态，如果是completed/failed，优先加载历史日志
+   * 连接到指定任务的WebSocket
    */
-  connect(taskId, taskStatus = null) {
-    // 如果已经在连接这个任务，不要重复连接
-    if (this.currentTaskId === taskId && (this.isConnecting || (this.websocket && this.websocket.readyState === WebSocket.OPEN))) {
-      console.log('Already connected or connecting to this task');
+  connect(taskId, taskStatus) {
+    // 如果已经连接到这个任务，不要重复连接
+    if (this.currentTaskId === taskId && this.websocket && 
+        this.websocket.readyState === WebSocket.OPEN) {
+      console.log('Already connected to task:', taskId);
+      return;
+    }
+
+    // 如果正在连接中，避免重复连接
+    if (this.isConnecting && this.currentTaskId === taskId) {
+      console.log('Already connecting to this task');
       return;
     }
 
     // 如果正在连接其他任务，先断开
     if (this.currentTaskId !== taskId && this.websocket) {
-      this.disconnect();
+      this.disconnect(1000, 'Switching to another task');
     }
 
     this.currentTaskId = taskId;
     this.isConnecting = true;
+    this.connectionClosed = false;
+    this.shouldReconnect = true;
 
     // 如果任务已完成或失败，优先从API获取历史日志
     if (taskStatus === 'completed' || taskStatus === 'failed') {
       console.log('Task is completed/failed, loading history only...');
+      this.shouldReconnect = false; // 已完成的任务不需要重连
       this.fetchHistory(taskId).then(data => {
         this.isConnecting = false;
         this.emit('connected', { taskId });
@@ -58,7 +70,9 @@ class LogService {
     } catch (error) {
       console.error('WebSocket connection error:', error);
       this.isConnecting = false;
-      this.handleReconnect(taskId);
+      if (this.shouldReconnect && !this.connectionClosed) {
+        this.handleReconnect(taskId);
+      }
     }
   }
 
@@ -70,18 +84,22 @@ class LogService {
 
     // 连接打开
     this.websocket.onopen = () => {
-      console.log('WebSocket connected');
-      this.reconnectAttempts = 0;
+      console.log('WebSocket connected to task:', taskId);
       this.isConnecting = false;
+      this.reconnectAttempts = 0;
       this.emit('connected', { taskId });
-      
-      // 启动心跳
       this.startHeartbeat();
     };
 
     // 接收消息
     this.websocket.onmessage = (event) => {
       try {
+        // 处理心跳响应
+        if (event.data === 'pong') {
+          this.clearHeartbeatTimeout();
+          return;
+        }
+        
         const data = JSON.parse(event.data);
         this.handleMessage(data);
       } catch (error) {
@@ -90,11 +108,21 @@ class LogService {
     };
 
     // 连接关闭
-    this.websocket.onclose = () => {
-      console.log('WebSocket disconnected');
+    this.websocket.onclose = (event) => {
+      console.log('WebSocket disconnected:', event.code, event.reason);
       this.stopHeartbeat();
-      this.emit('disconnected', { taskId });
-      this.handleReconnect(taskId);
+      this.isConnecting = false;
+      this.emit('disconnected', { taskId, code: event.code, reason: event.reason });
+      
+      // 只有在非正常关闭且允许重连时才重连
+      // 1000 = 正常关闭, 1001 = 端点离开
+      const isNormalClose = event.code === 1000 || event.code === 1001;
+      if (this.shouldReconnect && !isNormalClose && !this.connectionClosed) {
+        this.handleReconnect(taskId);
+      } else {
+        // 重置重连计数
+        this.reconnectAttempts = 0;
+      }
     };
 
     // 连接错误
@@ -119,6 +147,10 @@ class LogService {
       case 'status':
         // 任务状态更新
         this.emit('status', data);
+        // 如果任务已完成，标记不再重连
+        if (data.status === 'completed' || data.status === 'failed') {
+          this.shouldReconnect = false;
+        }
         break;
       
       default:
@@ -178,14 +210,21 @@ class LogService {
       return;
     }
     
+    // 如果不应该重连，直接返回
+    if (!this.shouldReconnect || this.connectionClosed) {
+      return;
+    }
+    
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('Max reconnection attempts reached');
       this.emit('reconnect_failed', { taskId });
+      this.shouldReconnect = false;
       return;
     }
 
     this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+    // 使用指数退避，但最大延迟不超过30秒
+    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000);
     
     console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
     this.emit('reconnecting', { 
@@ -195,8 +234,11 @@ class LogService {
     });
 
     this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null; // 清除定时器引用
-      this.connect(taskId);
+      this.reconnectTimer = null;
+      // 检查是否仍然需要重连
+      if (this.shouldReconnect && !this.connectionClosed) {
+        this.connect(taskId);
+      }
     }, delay);
   }
 
@@ -204,11 +246,35 @@ class LogService {
    * 心跳机制
    */
   startHeartbeat() {
+    this.stopHeartbeat(); // 确保没有重复的心跳
+    
     this.heartbeatTimer = setInterval(() => {
       if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
         this.websocket.send('ping');
+        
+        // 设置心跳超时检测
+        this.setHeartbeatTimeout();
       }
     }, 30000); // 每30秒发送一次心跳
+  }
+
+  setHeartbeatTimeout() {
+    this.clearHeartbeatTimeout();
+    
+    this.heartbeatTimeout = setTimeout(() => {
+      console.warn('Heartbeat timeout, closing connection');
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        // 心跳超时，可能是网络问题，触发重连
+        this.websocket.close(4000, 'Heartbeat timeout');
+      }
+    }, 5000); // 5秒内没收到pong就认为连接有问题
+  }
+
+  clearHeartbeatTimeout() {
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
   }
 
   stopHeartbeat() {
@@ -216,12 +282,20 @@ class LogService {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
+    this.clearHeartbeatTimeout();
   }
 
   /**
    * 断开连接
    */
-  disconnect() {
+  disconnect(code = 1000, reason = 'Normal closure') {
+    console.log('Disconnecting WebSocket:', reason);
+    
+    // 标记为主动关闭
+    this.connectionClosed = true;
+    this.shouldReconnect = false;
+    
+    // 清除所有定时器
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -229,11 +303,15 @@ class LogService {
 
     this.stopHeartbeat();
 
+    // 关闭WebSocket连接
     if (this.websocket) {
-      this.websocket.close();
+      if (this.websocket.readyState === WebSocket.OPEN) {
+        this.websocket.close(code, reason);
+      }
       this.websocket = null;
     }
 
+    // 重置状态
     this.reconnectAttempts = 0;
     this.currentTaskId = null;
     this.isConnecting = false;
@@ -250,56 +328,54 @@ class LogService {
   }
 
   off(event, callback) {
-    if (!this.listeners.has(event)) return;
-    
-    const callbacks = this.listeners.get(event);
-    const index = callbacks.indexOf(callback);
-    if (index > -1) {
-      callbacks.splice(index, 1);
+    if (this.listeners.has(event)) {
+      const callbacks = this.listeners.get(event);
+      const index = callbacks.indexOf(callback);
+      if (index > -1) {
+        callbacks.splice(index, 1);
+      }
     }
   }
 
   emit(event, data) {
-    if (!this.listeners.has(event)) return;
-    
-    const callbacks = this.listeners.get(event);
-    callbacks.forEach(callback => {
-      try {
-        callback(data);
-      } catch (error) {
-        console.error(`Error in event listener for ${event}:`, error);
-      }
-    });
+    if (this.listeners.has(event)) {
+      this.listeners.get(event).forEach(callback => {
+        try {
+          callback(data);
+        } catch (error) {
+          console.error(`Error in event listener for ${event}:`, error);
+        }
+      });
+    }
   }
 
   /**
-   * 获取历史日志（从API）
+   * 从API获取历史日志
    */
-  async fetchHistory(taskId, limit = 100) {
+  async fetchHistory(taskId) {
     try {
-      const response = await fetch(`http://localhost:8080/api/tasks/${taskId}/logs/history?limit=${limit}`);
+      const response = await fetch(`http://localhost:8080/api/tasks/${taskId}/logs/history`);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error('Failed to fetch log history');
       }
       
       const data = await response.json();
+      const logs = data.logs || [];
       
-      // 将历史日志添加到缓存
-      if (data.logs && data.logs.length > 0) {
-        data.logs.forEach(log => {
-          this.addLog(taskId, log);
-        });
-      }
+      // 添加到缓存
+      logs.forEach(log => this.addLog(taskId, log));
+      
+      // 触发日志事件
+      logs.forEach(log => this.emit('log', log));
       
       return data;
     } catch (error) {
-      console.error('Error fetching log history:', error);
+      console.error('Error fetching history:', error);
       throw error;
     }
   }
 }
 
-// 创建单例实例
+// 导出单例
 const logService = new LogService();
-
 export default logService;
