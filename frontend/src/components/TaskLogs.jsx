@@ -119,16 +119,16 @@ const TaskLogs = ({ taskId, taskStatus }) => {
 
     // 按级别过滤
     if (levelFilter !== 'ALL') {
-      filtered = filtered.filter(log => log.level === levelFilter);
+      filtered = filtered.filter(log => (log.level || 'INFO') === levelFilter);
     }
 
     // 按关键词搜索
     if (searchKeyword) {
       const keyword = searchKeyword.toLowerCase();
       filtered = filtered.filter(log => 
-        log.message.toLowerCase().includes(keyword) ||
-        log.stage?.toLowerCase().includes(keyword) ||
-        log.module?.toLowerCase().includes(keyword)
+        (log.message || '').toLowerCase().includes(keyword) ||
+        (log.stage || '').toLowerCase().includes(keyword) ||
+        (log.module || '').toLowerCase().includes(keyword)
       );
     }
 
@@ -293,21 +293,34 @@ const TaskLogs = ({ taskId, taskStatus }) => {
           {filteredLogs.length === 0 ? (
             <Empty description="暂无日志" />
           ) : (
-            filteredLogs.map((log) => (
-              <div key={log.id || `${log.timestamp}_${log.level}`} className={`log-item log-level-${log.level.toLowerCase()}`}>
-                <span className="log-time">{formatTimestamp(log.timestamp)}</span>
-                <Tag color={getLevelColor(log.level)} className="log-level">
-                  {log.level}
-                </Tag>
-                <span className="log-module">[{log.module}]</span>
-                <span className="log-message">{log.message}</span>
-                {log.metadata && Object.keys(log.metadata).length > 0 && (
-                  <span className="log-metadata">
-                    {JSON.stringify(log.metadata)}
-                  </span>
-                )}
-              </div>
-            ))
+            filteredLogs.map((log, index) => {
+              // Ensure log is an object
+              if (!log || typeof log !== 'object') {
+                return null;
+              }
+              
+              const level = String(log.level || 'INFO');
+              const module = String(log.module || 'system');
+              const message = String(log.message || '');
+              const timestamp = log.timestamp || new Date().toISOString();
+              const logId = log.id || `${timestamp}_${level}_${index}`;
+              
+              return (
+                <div key={logId} className={`log-item log-level-${level.toLowerCase()}`}>
+                  <span className="log-time">{formatTimestamp(timestamp)}</span>
+                  <Tag color={getLevelColor(level)} className="log-level">
+                    {level}
+                  </Tag>
+                  <span className="log-module">[{module}]</span>
+                  <span className="log-message">{message}</span>
+                  {log.metadata && typeof log.metadata === 'object' && Object.keys(log.metadata).length > 0 && (
+                    <span className="log-metadata">
+                      {JSON.stringify(log.metadata)}
+                    </span>
+                  )}
+                </div>
+              );
+            }).filter(Boolean)
           )}
           <div ref={logsEndRef} />
         </div>

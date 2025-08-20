@@ -7,10 +7,12 @@ import {
 import { 
   ArrowLeftOutlined, DownloadOutlined, CheckOutlined, 
   CloseOutlined, ReloadOutlined, ExclamationCircleOutlined,
-  QuestionCircleOutlined, InfoCircleOutlined, BulbOutlined
+  QuestionCircleOutlined, InfoCircleOutlined, BulbOutlined,
+  FileTextOutlined, SyncOutlined
 } from '@ant-design/icons';
 import { TaskDetail as TaskDetailType, Issue } from '../types';
 import { getTaskDetail, submitFeedback, downloadReport, retryTask } from '../services/api';
+import TaskLogs from '../components/TaskLogs';
 
 const { Panel } = Collapse;
 
@@ -198,6 +200,21 @@ const TaskDetail: React.FC = () => {
           </Descriptions.Item>
         </Descriptions>
       </Card>
+
+      {/* 实时日志 - 仅在处理中或等待中显示 */}
+      {(task.status === 'processing' || task.status === 'pending') && (
+        <Card 
+          title="实时日志" 
+          size="small"
+          extra={
+            <Tag color="processing">
+              <SyncOutlined spin /> 实时更新中
+            </Tag>
+          }
+        >
+          <TaskLogs taskId={task.id} taskStatus={task.status} />
+        </Card>
+      )}
 
       {/* 检测结果 */}
       {task.status === 'completed' && (

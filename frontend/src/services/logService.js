@@ -359,16 +359,26 @@ class LogService {
         throw new Error('Failed to fetch log history');
       }
       
-      const data = await response.json();
-      const logs = data.logs || [];
+      const logs = await response.json();
+      
+      // 确保每个日志都有必要的字段
+      const normalizedLogs = logs.map(log => ({
+        timestamp: log.timestamp || new Date().toISOString(),
+        level: log.level || 'INFO',
+        module: log.module || 'system',
+        stage: log.stage || null,
+        message: log.message || '',
+        progress: log.progress || null,
+        extra_data: log.extra_data || {}
+      }));
       
       // 添加到缓存
-      logs.forEach(log => this.addLog(taskId, log));
+      normalizedLogs.forEach(log => this.addLog(taskId, log));
       
       // 触发日志事件
-      logs.forEach(log => this.emit('log', log));
+      normalizedLogs.forEach(log => this.emit('log', log));
       
-      return data;
+      return { logs: normalizedLogs };
     } catch (error) {
       console.error('Error fetching history:', error);
       throw error;

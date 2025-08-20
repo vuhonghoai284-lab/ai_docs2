@@ -1,0 +1,123 @@
+# 测试模式配置文件
+# 用于本地开发和调试，不调用真实AI API
+
+# 服务器配置
+server:
+  host: "0.0.0.0"
+  port: 8080
+  debug: true  # 开启调试模式
+  reload: true  # 开启自动重载
+  workers: 1
+
+# 数据库
+database: ./data/test.db
+
+# 测试模式标志
+test_mode: true  # 启用测试模式
+
+# AI模型配置 - 测试模式
+ai_models:
+  default_index: 0
+  
+  # 测试模式下的模拟模型
+  models:
+    - label: "测试模型 (快速响应)"
+      provider: "mock"  # mock provider表示使用模拟数据
+      config:
+        api_key: "test-key-not-needed"
+        base_url: "http://localhost:8080/mock"
+        model: "mock-gpt-4"
+        temperature: 0.3
+        max_tokens: 8000
+        context_window: 128000
+        reserved_tokens: 2000
+        timeout: 1  # 快速响应
+        max_retries: 1
+        response_delay: 0.5  # 模拟响应延迟（秒）
+      description: "用于本地测试的模拟模型"
+      
+    - label: "测试模型 (慢速响应 - 1分钟)"
+      provider: "mock"
+      config:
+        api_key: "test-key-not-needed"
+        base_url: "http://localhost:8080/mock"
+        model: "mock-gpt-3.5-slow"
+        temperature: 0.5
+        max_tokens: 4096
+        context_window: 16000
+        reserved_tokens: 1500
+        timeout: 70  # 70秒超时
+        max_retries: 1
+        response_delay: 30  # 每个步骤30秒延迟
+        total_time: 60  # 总处理时间约1分钟
+        enable_detailed_logs: true  # 启用详细日志
+      description: "模拟较慢的响应（约1分钟）"
+
+# 文件设置
+file_settings:
+  max_file_size: 10485760  # 10MB
+  allowed_extensions:
+    - pdf
+    - docx
+    - md
+    - txt
+
+# 目录配置
+directories:
+  upload_dir: ./data/test/uploads
+  report_dir: ./data/test/reports
+  log_dir: ./data/test/logs
+  temp_dir: ./data/test/temp
+
+# 日志配置
+logging:
+  level: "DEBUG"  # 测试模式下使用DEBUG级别
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./data/test/logs/app.log"
+  max_size: 10485760
+  backup_count: 5
+
+# 任务处理配置
+task_processing:
+  max_concurrent_tasks: 5  # 测试时可以更多并发
+  task_timeout: 60  # 测试时shorter timeout
+  retry_failed_tasks: false  # 测试时不重试
+
+# CORS配置
+cors:
+  enabled: true
+  origins:
+    - "http://localhost:3000"
+    - "http://localhost:3001"
+    - "http://localhost:3002"
+    - "http://localhost:3003"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:3000"
+    - "http://127.0.0.1:5173"
+  allow_credentials: true
+  allow_methods: ["*"]
+  allow_headers: ["*"]
+
+# 测试数据配置
+test_data:
+  # 模拟的问题类型和数量
+  issue_types:
+    - type: "语法错误"
+      probability: 0.3
+      severities: ["严重", "一般", "提示"]
+    - type: "逻辑问题"
+      probability: 0.4
+      severities: ["致命", "严重", "一般"]
+    - type: "完整性"
+      probability: 0.3
+      severities: ["一般", "提示"]
+  
+  # 每个文档生成的问题数量范围
+  issues_per_document:
+    min: 3
+    max: 10
+  
+  # 模拟处理时间范围（秒）
+  processing_time:
+    min: 2
+    max: 5
