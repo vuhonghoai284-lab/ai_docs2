@@ -13,7 +13,7 @@ import {
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { taskAPI } from '../api';
-import { TaskDetail as TaskDetailType, Issue } from '../types';
+import { TaskDetail as TaskDetailType, Issue, AIOutput } from '../types';
 import TaskLogs from '../components/TaskLogs';
 import './TaskDetailEnhanced.css';
 
@@ -39,6 +39,8 @@ const TaskDetailEnhanced: React.FC = () => {
   const [taskDetail, setTaskDetail] = useState<EnhancedTaskDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [feedbackLoading, setFeedbackLoading] = useState<{ [key: number]: boolean }>({});
+  const [aiOutputs, setAiOutputs] = useState<AIOutput[]>([]);
+  const [aiOutputsLoading, setAiOutputsLoading] = useState(false);
   
   // 分页相关状态
   const [currentPage, setCurrentPage] = useState(1);
@@ -61,12 +63,29 @@ const TaskDetailEnhanced: React.FC = () => {
     setLoading(false);
   };
 
+  const loadAIOutputs = async () => {
+    if (!id) return;
+    
+    setAiOutputsLoading(true);
+    try {
+      const outputs = await taskAPI.getTaskAIOutputs(parseInt(id));
+      setAiOutputs(outputs);
+    } catch (error) {
+      message.error('加载AI输出失败');
+      console.error(error);
+    } finally {
+      setAiOutputsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadTaskDetail();
+    loadAIOutputs(); // 加载AI输出
     // 如果任务还在处理中，定期刷新
     const interval = setInterval(() => {
       if (taskDetail?.task.status === 'processing' || taskDetail?.task.status === 'pending') {
         loadTaskDetail();
+        loadAIOutputs(); // 刷新AI输出
       }
     }, 3000);
     return () => clearInterval(interval);
@@ -608,6 +627,155 @@ const TaskDetailEnhanced: React.FC = () => {
             key="logs"
           >
             <TaskLogs taskId={id} taskStatus={task.status} />
+          </Tabs.TabPane>
+
+          {/* AI输出标签页 */}
+          <Tabs.TabPane 
+            tab={
+              <Space>
+                <RobotOutlined />
+                <span>AI输出 ({aiOutputs.length})</span>
+              </Space>
+            } 
+            key="ai-outputs"
+          >
+            {aiOutputsLoading ? (
+              <div style={{ textAlign: 'center', padding: 50 }}>
+                <Spin size="large" tip="加载AI输出中..." />
+              </div>
+            ) : aiOutputs.length === 0 ? (
+              <Empty description="暂无AI输出记录" />
+            ) : (
+              <div className="ai-outputs-container">
+                {aiOutputs.map((output, index) => (
+                  <Card 
+                    key={output.id} 
+                    className="ai-output-card"
+                    style={{ marginBottom: 16 }}
+                    title={
+                      <Space>
+                        <span>#{index + 1}</span>
+                        <Tag color="blue">{output.operation_type}</Tag>
+                        {output.section_title && (
+                          <Text type="secondary">{output.section_title}</Text>
+                        )}
+                        <Tag color={output.status === 'success' ? 'green' : 'red'}>
+                          {output.status === 'success' ? '成功' : '失败'}
+                        </Tag>
+                      </Space>
+                    }
+                    extra={
+                      <Space>
+                        {output.tokens_used && (
+                          <Tag>Tokens: {output.tokens_used}</Tag>
+                        )}
+                        {output.processing_time && (
+                          <Tag>耗时: {output.processing_time.toFixed(2)}s</Tag>
+                        )}
+                      </Space>
+                    }
+                  >
+                    <Collapse ghost>
+                      {/* 输入文本 */}
+                      <Panel 
+                        header={
+                          <Space>
+                            <FileTextOutlined />
+                            <Text strong>输入文本 ({output.input_text.length} 字符)</Text>
+                          </Space>
+                        } 
+                        key="input"
+                      >
+                        <div style={{ 
+                          background: '#f0f2f5', 
+                          padding: 12, 
+                          borderRadius: 4,
+                          maxHeight: 300,
+                          overflow: 'auto',
+                          whiteSpace: 'pre-wrap',
+                          fontFamily: 'monospace',
+                          fontSize: 12
+                        }}>
+                          {output.input_text}
+                        </div>
+                      </Panel>
+
+                      {/* 原始输出 */}
+                      <Panel 
+                        header={
+                          <Space>
+                            <RobotOutlined />
+                            <Text strong>模型原始输出</Text>
+                          </Space>
+                        } 
+                        key="raw"
+                      >
+                        <div style={{ 
+                          background: '#f6ffed', 
+                          padding: 12, 
+                          borderRadius: 4,
+                          maxHeight: 400,
+                          overflow: 'auto',
+                          whiteSpace: 'pre-wrap',
+                          fontFamily: 'monospace',
+                          fontSize: 12
+                        }}>
+                          {output.raw_output}
+                        </div>
+                      </Panel>
+
+                      {/* 解析后的结构化输出 */}
+                      {output.parsed_output && (
+                        <Panel 
+                          header={
+                            <Space>
+                              <InfoCircleOutlined />
+                              <Text strong>解析后的结构化数据</Text>
+                            </Space>
+                          } 
+                          key="parsed"
+                        >
+                          <div style={{ 
+                            background: '#fff', 
+                            padding: 12, 
+                            borderRadius: 4,
+                            maxHeight: 400,
+                            overflow: 'auto'
+                          }}>
+                            <pre style={{ 
+                              margin: 0,
+                              fontFamily: 'monospace',
+                              fontSize: 12
+                            }}>
+                              {JSON.stringify(output.parsed_output, null, 2)}
+                            </pre>
+                          </div>
+                        </Panel>
+                      )}
+
+                      {/* 错误信息 */}
+                      {output.error_message && (
+                        <Panel 
+                          header={
+                            <Space>
+                              <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
+                              <Text strong style={{ color: '#ff4d4f' }}>错误信息</Text>
+                            </Space>
+                          } 
+                          key="error"
+                        >
+                          <Alert 
+                            message={output.error_message} 
+                            type="error" 
+                            showIcon 
+                          />
+                        </Panel>
+                      )}
+                    </Collapse>
+                  </Card>
+                ))}
+              </div>
+            )}
           </Tabs.TabPane>
         </Tabs>
       </Card>

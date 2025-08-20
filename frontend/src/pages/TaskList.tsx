@@ -262,7 +262,6 @@ const TaskList: React.FC = () => {
           <Progress 
             percent={Math.round(progress)} 
             size="small"
-            status={record.status === 'failed' ? 'exception' : undefined}
           />
         )
       ),

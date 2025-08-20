@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Card, Space, Descriptions, Tag, Spin, Button, Progress, 
-  message, Table, Empty, Radio, Input, Collapse, Alert 
+  message, Table, Empty, Radio, Input, Collapse, Alert, Tabs 
 } from 'antd';
 import { 
   ArrowLeftOutlined, DownloadOutlined, CheckOutlined, 

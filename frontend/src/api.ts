@@ -87,4 +87,10 @@ export const taskAPI = {
     const response = await api.get<AIOutput>(`/ai-outputs/${outputId}`);
     return response.data;
   },
+
+  // 重试任务
+  retryTask: async (taskId: number) => {
+    const response = await api.post(`/tasks/${taskId}/retry`);
+    return response.data;
+  },
 };

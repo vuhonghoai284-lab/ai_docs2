@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试文件上传</title>
+</head>
+<body>
+    <h1>测试文件上传和模型选择</h1>
+    
+    <form id="uploadForm">
+        <div>
+            <label>选择文件:</label>
+            <input type="file" id="fileInput" accept=".pdf,.docx,.md" required>
+        </div>
+        
+        <div>
+            <label>选择模型:</label>
+            <select id="modelSelect">
+                <option value="0">Claude 3.5 Sonnet (默认)</option>
+                <option value="1">GPT-3.5 Turbo (备用)</option>
+            </select>
+        </div>
+        
+        <button type="submit">上传并创建任务</button>
+    </form>
+    
+    <div id="result"></div>
+    
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const modelSelect = document.getElementById('modelSelect');
+            const resultDiv = document.getElementById('result');
+            
+            if (!fileInput.files[0]) {
+                alert('请选择文件');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('model_index', modelSelect.value);
+            
+            // 打印FormData内容
+            console.log('FormData contents:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}: ${value}`);
+            }
+            
+            try {
+                resultDiv.innerHTML = '上传中...';
+                
+                const response = await fetch('http://localhost:8080/api/tasks', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <h3>任务创建成功！</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">错误: ${error.message}</p>`;
+                console.error('Upload error:', error);
+            }
+        });
+    </script>
+</body>
+</html>

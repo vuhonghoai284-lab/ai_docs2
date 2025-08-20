@@ -177,7 +177,7 @@ const TaskCreate: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontWeight: 500 }}>
                           {model.label}
-                          {model.is_default && <Tag color="blue" size="small" style={{ marginLeft: 8 }}>默认</Tag>}
+                          {model.is_default && <Tag color="blue" style={{ marginLeft: 8 }}>默认</Tag>}
                         </span>
                         <Tooltip title={model.description}>
                           <InfoCircleOutlined style={{ color: '#8c8c8c' }} />
