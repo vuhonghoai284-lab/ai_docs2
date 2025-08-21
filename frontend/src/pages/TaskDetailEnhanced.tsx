@@ -2,20 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { 
   Card, Button, Tag, Progress, Space, message, Spin, Empty, 
   Input, Radio, Tabs, Typography, Pagination, Collapse, Badge,
-  Divider, Row, Col, Tooltip, Alert
+  Divider, Row, Col, Tooltip, Alert, Dropdown
 } from 'antd';
 import { 
   ArrowLeftOutlined, DownloadOutlined, CheckOutlined, CloseOutlined, 
   FileTextOutlined, ExclamationCircleOutlined, BulbOutlined,
   ThunderboltOutlined, UserOutlined, QuestionCircleOutlined,
   HistoryOutlined, RobotOutlined, InfoCircleOutlined, SwapOutlined,
-  EnvironmentOutlined, EditOutlined
+  EnvironmentOutlined, EditOutlined, DownOutlined
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { taskAPI } from '../api';
 import { TaskDetail as TaskDetailType, Issue, AIOutput } from '../types';
 import TaskLogs from '../components/TaskLogs';
 import './TaskDetailEnhanced.css';
+import './TaskDetailCompact.css';
 
 const { Text, Paragraph, Title } = Typography;
 const { Panel } = Collapse;
@@ -96,6 +97,35 @@ const TaskDetailEnhanced: React.FC = () => {
     try {
       await taskAPI.submitFeedback(issueId, feedbackType, comment);
       message.success('反馈已提交');
+      loadTaskDetail();
+    } catch (error) {
+      message.error('提交反馈失败');
+    }
+    setFeedbackLoading({ ...feedbackLoading, [issueId]: false });
+  };
+
+  const handleQuickFeedback = async (issueId: number, feedbackType: 'accept' | 'reject' | null, comment?: string) => {
+    if (feedbackType === null) {
+      // 重新处理：清除之前的反馈
+      setFeedbackLoading({ ...feedbackLoading, [issueId]: true });
+      try {
+        // 这里需要后端支持清除反馈的API，暂时重新加载
+        loadTaskDetail();
+        message.info('已重置，可重新处理');
+      } catch (error) {
+        message.error('操作失败');
+      }
+      setFeedbackLoading({ ...feedbackLoading, [issueId]: false });
+      return;
+    }
+
+    setFeedbackLoading({ ...feedbackLoading, [issueId]: true });
+    try {
+      await taskAPI.submitFeedback(issueId, feedbackType, comment);
+      message.success(
+        feedbackType === 'accept' ? '已接受此问题' : '已拒绝此问题',
+        1.5
+      );
       loadTaskDetail();
     } catch (error) {
       message.error('提交反馈失败');
@@ -358,7 +388,49 @@ const TaskDetailEnhanced: React.FC = () => {
                             </div>
                           </div>
                         </Col>
-
+                        <Col span={8}>
+                          <div className="stat-section">
+                            <Text type="secondary">问题级别分布</Text>
+                            <div className="severity-bars">
+                              <div className="bar-item">
+                                <Text>致命</Text>
+                                <Progress 
+                                  percent={totalIssues ? Math.round((severityCounts['致命'] / totalIssues) * 100) : 0} 
+                                  size="small"
+                                  strokeColor="#ff4d4f"
+                                  format={() => severityCounts['致命']}
+                                />
+                              </div>
+                              <div className="bar-item">
+                                <Text>严重</Text>
+                                <Progress 
+                                  percent={totalIssues ? Math.round((severityCounts['严重'] / totalIssues) * 100) : 0}
+                                  size="small"
+                                  strokeColor="#faad14"
+                                  format={() => severityCounts['严重']}
+                                />
+                              </div>
+                              <div className="bar-item">
+                                <Text>一般</Text>
+                                <Progress 
+                                  percent={totalIssues ? Math.round((severityCounts['一般'] / totalIssues) * 100) : 0}
+                                  size="small"
+                                  strokeColor="#1890ff"
+                                  format={() => severityCounts['一般']}
+                                />
+                              </div>
+                              <div className="bar-item">
+                                <Text>提示</Text>
+                                <Progress 
+                                  percent={totalIssues ? Math.round((severityCounts['提示'] / totalIssues) * 100) : 0}
+                                  size="small"
+                                  strokeColor="#52c41a"
+                                  format={() => severityCounts['提示']}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </Col>
                         <Col span={8}>
                           <div className="stat-section">
                             <Text type="secondary">接受率</Text>
@@ -383,201 +455,287 @@ const TaskDetailEnhanced: React.FC = () => {
                       </Row>
                     </Card>
 
-                    {/* 问题列表 */}
+                    {/* 问题列表 - 紧凑设计 */}
                     <div className="issues-list">
                       {paginatedIssues.map((issue) => (
                         <Card 
                           key={issue.id} 
-                          className={`issue-card issue-severity-${issue.severity.toLowerCase()}`}
+                          className={`issue-card-compact issue-severity-${issue.severity.toLowerCase()} ${issue.feedback_type ? 'processed' : 'pending'}`}
                           size="small"
                         >
-                          {/* 问题标题栏 - 新布局 */}
-                          <div className="issue-header-new">
-                            <div className="issue-title">
+                          {/* 紧凑的问题头部 */}
+                          <div className="issue-header-compact">
+                            <div className="issue-main-info">
                               <span className="issue-number">#{startIndex + paginatedIssues.indexOf(issue) + 1}</span>
-                              <Text className="issue-desc">{issue.description}</Text>
+                              <span className="issue-type-badge">[{issue.issue_type}]</span>
+                              <Text className="issue-desc" ellipsis={{ tooltip: issue.description }}>
+                                {issue.description}
+                              </Text>
                             </div>
-                            <Space className="issue-tags" size={6}>
+                            <div className="issue-actions-compact">
                               {getSeverityBadge(issue.severity)}
-                              <Tag color="blue">{issue.issue_type}</Tag>
                               {issue.feedback_type ? (
                                 <Tag icon={issue.feedback_type === 'accept' ? <CheckOutlined /> : <CloseOutlined />} 
-                                     color={issue.feedback_type === 'accept' ? 'success' : 'error'}>
+                                     color={issue.feedback_type === 'accept' ? 'success' : 'error'}
+                                     size="small">
                                   {issue.feedback_type === 'accept' ? '已接受' : '已拒绝'}
                                 </Tag>
-                              ) : (
-                                <Tag color="default">待处理</Tag>
-                              )}
-                            </Space>
-                          </div>
-
-                          {/* 对比展示区 - 原文 vs 改进建议 */}
-                          <div className="issue-comparison">
-                            <Row gutter={16}>
-                              <Col span={12}>
-                                <div className="comparison-section original">
-                                  <div className="comparison-header">
-                                    <FileTextOutlined style={{ color: '#ff4d4f' }} />
-                                    <Text strong> 原文内容</Text>
-                                  </div>
-                                  <div className="comparison-content">
-                                    {issue.original_text || '未提供原文'}
-                                  </div>
-                                </div>
-                              </Col>
-                              <Col span={12}>
-                                <div className="comparison-section suggestion">
-                                  <div className="comparison-header">
-                                    <EditOutlined style={{ color: '#52c41a' }} />
-                                    <Text strong> 改进建议</Text>
-                                  </div>
-                                  <div className="comparison-content">
-                                    {issue.suggestion || '未提供建议'}
-                                  </div>
-                                </div>
-                              </Col>
-                            </Row>
-                          </div>
-
-                          {/* 更多信息 - 默认折叠 */}
-                          {(issue.location || issue.reasoning || issue.user_impact || issue.context) && (
-                              <Collapse 
-                                ghost 
-                                className="more-info-collapse"
-                                activeKey={expandedSections[issue.id]?.has('moreInfo') ? ['moreInfo'] : []}
-                                onChange={() => toggleSection(issue.id, 'moreInfo')}
-                              >
-                                <Panel
-                                  header={
-                                    <Space size={4}>
-                                      <InfoCircleOutlined style={{ color: '#1890ff' }} />
-                                      <Text>更多信息</Text>
-                                    </Space>
-                                  }
-                                  key="moreInfo"
-                                >
-                                  <div className="more-info-content">
-                                    {issue.location && (
-                                      <div className="info-item">
-                                        <EnvironmentOutlined style={{ color: '#8c8c8c' }} />
-                                        <Text strong> 章节位置：</Text>
-                                        <Text>{issue.location}</Text>
-                                      </div>
-                                    )}
-                                    {issue.reasoning && (
-                                      <div className="info-item">
-                                        <ThunderboltOutlined style={{ color: '#1890ff' }} />
-                                        <Text strong> 判定原因：</Text>
-                                        <Text>{issue.reasoning}</Text>
-                                      </div>
-                                    )}
-                                    {issue.user_impact && (
-                                      <div className="info-item">
-                                        <UserOutlined style={{ color: '#faad14' }} />
-                                        <Text strong> 用户影响：</Text>
-                                        <Text>{issue.user_impact}</Text>
-                                      </div>
-                                    )}
-                                    {issue.context && (
-                                      <div className="info-item">
-                                        <FileTextOutlined style={{ color: '#722ed1' }} />
-                                        <Text strong> 上下文环境：</Text>
-                                        <Text>{issue.context}</Text>
-                                      </div>
-                                    )}
-                                  </div>
-                                </Panel>
-                              </Collapse>
-                            )}
-
-                            {/* 用户反馈区（紧凑布局） */}
-                            <div className="feedback-section-compact">
-                              <div className="feedback-actions">
-                                <Space size={8}>
-                                  <UserOutlined style={{ color: '#1890ff' }} />
-                                  <Text strong>用户操作：</Text>
-                                  <Radio.Group
-                                    size="small"
-                                    value={issue.feedback_type}
-                                    onChange={(e) => handleFeedback(issue.id, e.target.value, issue.feedback_comment)}
-                                    disabled={feedbackLoading[issue.id]}
-                                  >
-                                    <Radio.Button value="accept">
-                                      <CheckOutlined /> 接受
-                                    </Radio.Button>
-                                    <Radio.Button value="reject">
-                                      <CloseOutlined /> 拒绝
-                                    </Radio.Button>
-                                  </Radio.Group>
-                                  {issue.feedback_type && (
-                                    <Tag color={issue.feedback_type === 'accept' ? 'green' : 'red'}>
-                                      {issue.feedback_type === 'accept' ? '已接受' : '已拒绝'}
-                                    </Tag>
-                                  )}
-                                  <Button
-                                    type="link"
-                                    size="small"
-                                    icon={expandedComments.has(issue.id) ? <CloseOutlined /> : <FileTextOutlined />}
-                                    onClick={() => toggleComment(issue.id)}
-                                  >
-                                    {expandedComments.has(issue.id) ? '收起评论' : 
-                                     issue.feedback_comment ? '编辑评论' : '添加评论'}
-                                  </Button>
-                                  {issue.feedback_comment && !expandedComments.has(issue.id) && (
-                                    <Tooltip title={issue.feedback_comment}>
-                                      <Tag icon={<FileTextOutlined />} color="blue">已评论</Tag>
-                                    </Tooltip>
-                                  )}
-                                </Space>
-                              </div>
-                              
-                              {/* 评论输入框（可展开） */}
-                              {expandedComments.has(issue.id) && (
-                                <div className="feedback-comment-area">
-                                  <TextArea
-                                    placeholder="请输入反馈意见..."
-                                    rows={2}
-                                    size="small"
-                                    value={issue.feedback_comment || ''}
-                                    onChange={(e) => {
-                                      const newIssues = [...issues];
-                                      const idx = newIssues.findIndex(i => i.id === issue.id);
-                                      if (idx >= 0) {
-                                        newIssues[idx].feedback_comment = e.target.value;
-                                        setTaskDetail({ ...taskDetail, issues: newIssues });
-                                      }
-                                    }}
-                                    onBlur={(e) => {
-                                      if (issue.feedback_type && e.target.value) {
-                                        handleFeedback(issue.id, issue.feedback_type, e.target.value);
-                                      }
-                                    }}
-                                  />
-                                  <div className="comment-actions">
-                                    <Space size={4}>
-                                      <Button 
-                                        size="small" 
-                                        type="primary"
-                                        onClick={() => {
-                                          if (issue.feedback_type) {
-                                            handleFeedback(issue.id, issue.feedback_type, issue.feedback_comment);
-                                            toggleComment(issue.id);
-                                          }
-                                        }}
-                                      >
-                                        保存
-                                      </Button>
-                                      <Button 
-                                        size="small"
-                                        onClick={() => toggleComment(issue.id)}
-                                      >
-                                        取消
-                                      </Button>
-                                    </Space>
-                                  </div>
-                                </div>
-                              )}
+                              ) : null}
                             </div>
+                          </div>
+
+                          {/* 原文预览（仅显示关键部分） */}
+                          {issue.original_text && (
+                            <div className="issue-preview">
+                              <Text type="secondary" className="preview-label">原文：</Text>
+                              <Text className="preview-text" ellipsis={{ tooltip: issue.original_text }}>
+                                {issue.original_text}
+                              </Text>
+                            </div>
+                          )}
+
+                          {/* 改进建议（紧凑显示） */}
+                          {issue.suggestion && (
+                            <div className="suggestion-preview">
+                              <Text type="secondary" className="preview-label">建议：</Text>
+                              <Text className="suggestion-text" ellipsis={{ tooltip: issue.suggestion }}>
+                                {issue.suggestion}
+                              </Text>
+                            </div>
+                          )}
+
+                          {/* 快速操作区 */}
+                          <div className="quick-actions">
+                            {!issue.feedback_type ? (
+                              <Space size={8}>
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  icon={<CheckOutlined />}
+                                  loading={feedbackLoading[issue.id]}
+                                  onClick={() => handleQuickFeedback(issue.id, 'accept')}
+                                >
+                                  接受
+                                </Button>
+                                <Button
+                                  danger
+                                  size="small"
+                                  icon={<CloseOutlined />}
+                                  loading={feedbackLoading[issue.id]}
+                                  onClick={() => handleQuickFeedback(issue.id, 'reject')}
+                                >
+                                  拒绝
+                                </Button>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<FileTextOutlined />}
+                                  onClick={() => toggleComment(issue.id)}
+                                >
+                                  {issue.feedback_comment ? '编辑评论' : '添加评论'}
+                                </Button>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<InfoCircleOutlined />}
+                                  onClick={() => toggleSection(issue.id, 'details')}
+                                >
+                                  详情
+                                </Button>
+                              </Space>
+                            ) : (
+                              <Space size={8}>
+                                <Text type="secondary">
+                                  已{issue.feedback_type === 'accept' ? '接受' : '拒绝'}
+                                </Text>
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  onClick={() => handleQuickFeedback(issue.id, null)}
+                                >
+                                  重新处理
+                                </Button>
+                                {issue.feedback_comment && (
+                                  <Tooltip title={issue.feedback_comment}>
+                                    <Tag icon={<FileTextOutlined />} color="blue" size="small">有评论</Tag>
+                                  </Tooltip>
+                                )}
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<InfoCircleOutlined />}
+                                  onClick={() => toggleSection(issue.id, 'details')}
+                                >
+                                  详情
+                                </Button>
+                              </Space>
+                            )}
+                          </div>
+
+                          {/* 详情信息 - 默认折叠 */}
+                          <div className="details-section">
+                            <Collapse 
+                              ghost 
+                              className="details-collapse"
+                              activeKey={expandedSections[issue.id]?.has('details') ? ['details'] : []}
+                              onChange={() => toggleSection(issue.id, 'details')}
+                            >
+                              <Panel
+                                header={
+                                  <Space size={4}>
+                                    <InfoCircleOutlined style={{ color: '#1890ff' }} />
+                                    <Text>详细信息</Text>
+                                  </Space>
+                                }
+                                key="details"
+                              >
+                                {/* 原文对比展示 */}
+                                {(issue.original_text || issue.suggestion) && (
+                                  <div className="comparison-section">
+                                    <Row gutter={16}>
+                                      <Col span={12}>
+                                        <div className="comparison-box">
+                                          <div className="comparison-header">
+                                            <FileTextOutlined style={{ color: '#ff4d4f' }} />
+                                            <Text strong> 原文内容</Text>
+                                          </div>
+                                          <div className="comparison-content">
+                                            {issue.original_text || '未提供原文'}
+                                          </div>
+                                        </div>
+                                      </Col>
+                                      <Col span={12}>
+                                        <div className="comparison-box">
+                                          <div className="comparison-header">
+                                            <EditOutlined style={{ color: '#52c41a' }} />
+                                            <Text strong> 改进建议</Text>
+                                          </div>
+                                          <div className="comparison-content">
+                                            {issue.suggestion || '未提供建议'}
+                                          </div>
+                                        </div>
+                                      </Col>
+                                    </Row>
+                                  </div>
+                                )}
+
+                                {/* 详细分析 */}
+                                <div className="more-info-content">
+                                  {issue.location && (
+                                    <div className="info-item">
+                                      <EnvironmentOutlined style={{ color: '#8c8c8c' }} />
+                                      <Text strong> 章节位置：</Text>
+                                      <Text>{issue.location}</Text>
+                                    </div>
+                                  )}
+                                  {issue.reasoning && (
+                                    <div className="info-item">
+                                      <ThunderboltOutlined style={{ color: '#1890ff' }} />
+                                      <Text strong> 判定原因：</Text>
+                                      <Text>{issue.reasoning}</Text>
+                                    </div>
+                                  )}
+                                  {issue.user_impact && (
+                                    <div className="info-item">
+                                      <UserOutlined style={{ color: '#faad14' }} />
+                                      <Text strong> 用户影响：</Text>
+                                      <Text>{issue.user_impact}</Text>
+                                    </div>
+                                  )}
+                                  {issue.context && (
+                                    <div className="info-item">
+                                      <FileTextOutlined style={{ color: '#722ed1' }} />
+                                      <Text strong> 上下文环境：</Text>
+                                      <Text>{issue.context}</Text>
+                                    </div>
+                                  )}
+                                </div>
+                              </Panel>
+                            </Collapse>
+                          </div>
+
+                          {/* 评论输入区（可展开） */}
+                          {expandedComments.has(issue.id) && (
+                            <div className="comment-section">
+                              <div className="comment-input-area">
+                                <div className="comment-header">
+                                  <UserOutlined style={{ color: '#1890ff' }} />
+                                  <Text strong> 添加评论</Text>
+                                </div>
+                                <TextArea
+                                  placeholder="请输入反馈意见..."
+                                  rows={3}
+                                  value={issue.feedback_comment || ''}
+                                  onChange={(e) => {
+                                    const newIssues = [...issues];
+                                    const idx = newIssues.findIndex(i => i.id === issue.id);
+                                    if (idx >= 0) {
+                                      newIssues[idx].feedback_comment = e.target.value;
+                                      setTaskDetail({ ...taskDetail, issues: newIssues });
+                                    }
+                                  }}
+                                  className="comment-textarea"
+                                />
+                                <div className="comment-actions">
+                                  <Space size={8}>
+                                    <Dropdown
+                                      trigger={['click']}
+                                      menu={{
+                                        items: [
+                                          { key: '1', label: '同意此建议' },
+                                          { key: '2', label: '不适用于当前文档' },
+                                          { key: '3', label: '需要进一步确认' },
+                                          { key: '4', label: '误报' },
+                                          { key: '5', label: '自定义输入...' },
+                                        ],
+                                        onClick: ({ key }) => {
+                                          const templates = [
+                                            '同意此建议',
+                                            '不适用于当前文档',
+                                            '需要进一步确认',
+                                            '误报',
+                                            ''
+                                          ];
+                                          const template = templates[parseInt(key) - 1] || '';
+                                          
+                                          if (template) {
+                                            const newIssues = [...issues];
+                                            const idx = newIssues.findIndex(i => i.id === issue.id);
+                                            if (idx >= 0) {
+                                              newIssues[idx].feedback_comment = template;
+                                              setTaskDetail({ ...taskDetail, issues: newIssues });
+                                            }
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      <Button size="small" type="dashed">
+                                        快速模板 <DownOutlined />
+                                      </Button>
+                                    </Dropdown>
+                                    <Button 
+                                      size="small" 
+                                      type="primary"
+                                      onClick={async () => {
+                                        if (issue.feedback_type) {
+                                          await handleFeedback(issue.id, issue.feedback_type, issue.feedback_comment);
+                                          toggleComment(issue.id);
+                                        }
+                                      }}
+                                    >
+                                      保存评论
+                                    </Button>
+                                    <Button 
+                                      size="small"
+                                      onClick={() => toggleComment(issue.id)}
+                                    >
+                                      取消
+                                    </Button>
+                                  </Space>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </Card>
                       ))}
                     </div>

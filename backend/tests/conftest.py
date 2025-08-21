@@ -5,8 +5,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 import sys
 import os
+import tempfile
+
+# 设置测试环境变量（必须在导入应用之前）
+os.environ['APP_MODE'] = 'test'
 
 # 添加父目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,9 +19,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.main import app
 from app.core.database import Base, get_db
 
-# 创建测试数据库
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+# 导入所有模型以确保它们被包含在Base.metadata中
+from app.models.user import User
+from app.models.task import Task
+from app.models.ai_model import AIModel
+from app.models.file_info import FileInfo
+
+# 创建内存测试数据库 - 使用StaticPool确保所有连接使用同一个内存数据库
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, 
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,  # 使用静态连接池，确保所有连接使用同一个内存数据库
+    echo=False
+)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -29,14 +45,52 @@ def override_get_db():
         db.close()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")  # 改为function级别
 def client():
     """创建测试客户端"""
     # 创建测试数据库表
     Base.metadata.create_all(bind=engine)
     
-    # 覆盖依赖
+    # 覆盖依赖（必须在创建表之后，在初始化数据之前）
     app.dependency_overrides[get_db] = override_get_db
+    
+    # 初始化基础数据
+    db = TestingSessionLocal()
+    try:
+        # 创建测试用AI模型
+        from app.models.ai_model import AIModel
+        
+        test_model = AIModel(
+            model_key="gpt-4o-mini",
+            label="GPT-4o Mini (快速)",
+            provider="openai",
+            model_name="gpt-4o-mini",
+            description="OpenAI GPT-4o Mini模型",
+            is_active=True,
+            is_default=True,
+            sort_order=0
+        )
+        
+        test_model2 = AIModel(
+            model_key="claude-3-sonnet",
+            label="Claude 3 Sonnet",
+            provider="anthropic", 
+            model_name="claude-3-sonnet-20240229",
+            description="Anthropic Claude 3 Sonnet模型",
+            is_active=True,
+            is_default=False,
+            sort_order=1
+        )
+        
+        db.add(test_model)
+        db.add(test_model2)
+        db.commit()
+        print(f"✓ 已初始化 2 个AI模型")
+    except Exception as e:
+        print(f"初始化测试数据失败: {e}")
+        db.rollback()
+    finally:
+        db.close()
     
     # 创建测试客户端
     with TestClient(app) as c:
@@ -44,6 +98,7 @@ def client():
     
     # 清理
     Base.metadata.drop_all(bind=engine)
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -51,3 +106,124 @@ def sample_file():
     """创建测试文件"""
     content = b"# Test Document\nThis is a test content."
     return ("test.md", content, "text/markdown")
+
+
+@pytest.fixture
+def large_file():
+    """创建大文件用于测试"""
+    content = b"# Large Test Document\n" + b"This is test content.\n" * 10000
+    return ("large_test.md", content, "text/markdown")
+
+
+@pytest.fixture
+def invalid_file():
+    """创建无效文件类型"""
+    content = b"\x00\x01\x02\x03"  # 二进制内容
+    return ("test.exe", content, "application/octet-stream")
+
+
+@pytest.fixture
+def sample_pdf_file():
+    """创建PDF测试文件"""
+    # 简单的PDF文件头
+    content = b"%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n"
+    return ("test.pdf", content, "application/pdf")
+
+
+@pytest.fixture
+def test_db_session():
+    """获取测试数据库会话"""
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@pytest.fixture
+def admin_user_token(client):
+    """创建管理员用户并返回token - 通过API"""
+    # 通过系统管理员登录API获取token
+    login_data = {"username": "admin", "password": "admin123"}
+    response = client.post("/api/auth/system/login", data=login_data)
+    if response.status_code == 200:
+        result = response.json()
+        return {"token": result["access_token"], "user": result["user"]}
+    else:
+        # 如果系统登录失败，创建测试用户
+        from app.repositories.user import UserRepository
+        from app.services.auth import AuthService
+        
+        db = TestingSessionLocal()
+        try:
+            user_repo = UserRepository(db)
+            auth_service = AuthService(db)
+            
+            admin_data = UserCreate(
+                uid="test_admin",
+                display_name="测试管理员", 
+                email="admin@test.com",
+                is_admin=True,
+                is_system_admin=True
+            )
+            
+            admin_user = user_repo.create(admin_data)
+            token = auth_service.create_access_token(data={"sub": str(admin_user.id)})
+            
+            return {"token": token, "user": admin_user}
+        finally:
+            db.close()
+
+
+@pytest.fixture
+def normal_user_token(client):
+    """创建普通用户并返回token - 通过API"""
+    # 通过第三方认证API获取token
+    auth_data = {"code": "test_user_auth_code"}
+    response = client.post("/api/auth/thirdparty/login", json=auth_data)
+    if response.status_code == 200:
+        result = response.json()
+        return {"token": result["access_token"], "user": result["user"]}
+    else:
+        # 如果第三方登录失败，创建测试用户
+        from app.repositories.user import UserRepository
+        from app.services.auth import AuthService
+        
+        db = TestingSessionLocal()
+        try:
+            user_repo = UserRepository(db)
+            auth_service = AuthService(db)
+            
+            user_data = UserCreate(
+                uid="test_user_001",
+                display_name="测试用户001",
+                email="user001@test.com",
+                is_admin=False,
+                is_system_admin=False
+            )
+            
+            normal_user = user_repo.create(user_data)
+            token = auth_service.create_access_token(data={"sub": str(normal_user.id)})
+            
+            return {"token": token, "user": normal_user}
+        finally:
+            db.close()
+
+
+@pytest.fixture
+def auth_headers(admin_user_token):
+    """管理员认证头"""
+    return {"Authorization": f"Bearer {admin_user_token['token']}"}
+
+
+@pytest.fixture
+def normal_auth_headers(normal_user_token):
+    """普通用户认证头"""
+    return {"Authorization": f"Bearer {normal_user_token['token']}"}
+
+
+@pytest.fixture
+def temp_upload_dir():
+    """创建临时上传目录"""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        yield temp_dir

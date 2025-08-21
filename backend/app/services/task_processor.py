@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 from app.repositories.task import TaskRepository
 from app.repositories.issue import IssueRepository
 from app.repositories.ai_output import AIOutputRepository
+from app.repositories.file_info import FileInfoRepository
+from app.repositories.ai_model import AIModelRepository
 from app.services.ai_service_factory import AIServiceFactory
 from app.core.config import get_settings
 from app.services.websocket import manager
@@ -26,7 +28,10 @@ class TaskProcessor:
         self.task_repo = TaskRepository(db)
         self.issue_repo = IssueRepository(db)
         self.ai_output_repo = AIOutputRepository(db)
+        self.file_repo = FileInfoRepository(db)
+        self.model_repo = AIModelRepository(db)
         self.settings = get_settings()
+        self.ai_service_factory = AIServiceFactory()
     
     async def process_task(self, task_id: int):
         """处理任务"""
@@ -42,25 +47,55 @@ class TaskProcessor:
             # 更新状态为处理中
             self.task_repo.update(task_id, status="processing", progress=10)
             await manager.send_status(task_id, "processing")
-            await self._log(task_id, "INFO", f"正在处理文档: {task.file_name}", "文档解析", 10)
+            # 获取文件信息
+            file_info = None
+            if task.file_id:
+                file_info = self.file_repo.get_by_id(task.file_id)
             
-            # 获取AI服务
-            model_index = task.model_index or self.settings.default_model_index
-            ai_service = AIServiceFactory.get_service_for_model(model_index, self.settings)
+            file_name = file_info.original_name if file_info else "未知文件"
+            await self._log(task_id, "INFO", f"正在处理文档: {file_name}", "文档解析", 10)
+            
+            # 获取AI模型信息
+            ai_model = None
+            if task.model_id:
+                ai_model = self.model_repo.get_by_id(task.model_id)
+            
+            if not ai_model:
+                ai_model = self.model_repo.get_default_model()
+                
+            if not ai_model:
+                raise ValueError("没有可用的AI模型")
+            
+            # 获取AI服务（暂时使用默认模型索引，这里需要改进）
+            # TODO: 需要改进AI服务工厂以支持通过模型键获取服务
+            ai_services = self.ai_service_factory.get_service_for_model(self.settings.default_model_index, self.settings)
+            
+            # 根据测试模式选择合适的服务
+            if self.settings.is_test_mode and 'mock_service' in ai_services:
+                ai_service = ai_services['mock_service']
+            else:
+                # 这里需要根据实际情况选择document_processor或其他服务
+                ai_service = ai_services.get('document_processor') or ai_services.get('mock_service')
+            
+            if not ai_service:
+                raise ValueError("无法获取AI服务")
             
             # 如果是Mock服务，设置WebSocket上下文
             if hasattr(ai_service, 'set_context'):
                 await ai_service.set_context(task_id, manager)
             
             # 读取文件内容
-            file_path = Path(task.file_path)
-            if file_path.exists():
+            file_path = None
+            if file_info and file_info.file_path:
+                file_path = Path(file_info.file_path)
+            
+            if file_path and file_path.exists():
                 # 优先读取真实文件
                 with open(file_path, 'r', encoding='utf-8') as f:
                     file_content = f.read()
             elif self.settings.is_test_mode:
                 # 测试模式下，如果文件不存在，使用模拟内容
-                file_content = self._generate_test_content(task.file_name)
+                file_content = self._generate_test_content(file_name)
             else:
                 # 生产模式下，文件必须存在
                 raise FileNotFoundError(f"文件不存在: {file_path}")

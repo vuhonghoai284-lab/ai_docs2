@@ -1,0 +1,226 @@
+"""
+TaskProcessor单元测试
+"""
+import pytest
+import asyncio
+from unittest.mock import Mock, patch, AsyncMock
+from app.services.task_processor import TaskProcessor
+from tests.fixtures.mock_helpers import create_mock_dependencies, MockAIService
+
+
+class TestTaskProcessor:
+    """任务处理器单元测试"""
+    
+    @pytest.fixture
+    def mock_db(self):
+        """Mock数据库会话"""
+        return Mock()
+    
+    @pytest.fixture
+    def mock_deps(self):
+        """创建所有Mock依赖"""
+        return create_mock_dependencies()
+    
+    @pytest.fixture
+    def task_processor(self, mock_db):
+        """创建TaskProcessor实例"""
+        with patch('app.services.task_processor.TaskRepository') as mock_task_repo_class:
+            with patch('app.services.task_processor.FileInfoRepository') as mock_file_repo_class:
+                with patch('app.services.task_processor.IssueRepository') as mock_issue_repo_class:
+                    with patch('app.services.task_processor.AIOutputRepository') as mock_ai_output_repo_class:
+                        with patch('app.services.task_processor.AIModelRepository') as mock_model_repo_class:
+                            with patch('app.services.task_processor.AIServiceFactory') as mock_ai_service_factory_class:
+                                with patch('app.services.task_processor.get_settings') as mock_get_settings:
+                                    # 创建Mock实例
+                                    mock_task_repo = Mock()
+                                    mock_file_repo = Mock()
+                                    mock_issue_repo = Mock()
+                                    mock_ai_output_repo = Mock()
+                                    mock_model_repo = Mock()
+                                    mock_ai_service_factory = Mock()
+                                    mock_settings = Mock()
+                                    
+                                    # 设置Mock类返回Mock实例
+                                    mock_task_repo_class.return_value = mock_task_repo
+                                    mock_file_repo_class.return_value = mock_file_repo
+                                    mock_issue_repo_class.return_value = mock_issue_repo
+                                    mock_ai_output_repo_class.return_value = mock_ai_output_repo
+                                    mock_model_repo_class.return_value = mock_model_repo
+                                    mock_ai_service_factory_class.return_value = mock_ai_service_factory
+                                    mock_get_settings.return_value = mock_settings
+                                    
+                                    # 设置默认配置
+                                    mock_settings.default_model_index = 0
+                                    mock_settings.is_test_mode = False
+                                    
+                                    processor = TaskProcessor(mock_db)
+                                    
+                                    # 将Mock对象存储为属性以便测试访问
+                                    processor._mock_task_repo = mock_task_repo
+                                    processor._mock_file_repo = mock_file_repo
+                                    processor._mock_issue_repo = mock_issue_repo
+                                    processor._mock_ai_output_repo = mock_ai_output_repo
+                                    processor._mock_model_repo = mock_model_repo
+                                    processor._mock_ai_service_factory = mock_ai_service_factory
+                                    processor._mock_settings = mock_settings
+                                    
+                                    return processor
+    
+    @pytest.mark.asyncio
+    async def test_process_task_normal_flow(self, task_processor, mock_deps):
+        """测试正常任务处理流程"""
+        # 准备测试数据
+        task_id = 1
+        mock_task = mock_deps['task_repo'].create_mock_task(
+            task_id=task_id,
+            status='pending',
+            progress=0
+        )
+        
+        mock_file = mock_deps['file_repo'].create_mock_file(
+            task_id=task_id,
+            file_path='/uploads/test.md'
+        )
+        
+        # 配置Mock行为
+        task_processor.task_repo.get.return_value = mock_task
+        task_processor.file_repo.get_by_task_id.return_value = mock_file
+        task_processor.model_repo.get_by_id.return_value = Mock()
+        
+        # 创建模拟文件内容
+        with patch('builtins.open', mock_open(read_data='# 测试文档\n测试内容')):
+            # 执行测试
+            await task_processor.process_task(task_id)
+            
+            # 验证结果
+            # 验证状态更新调用
+            assert task_processor.task_repo.update.call_count >= 2
+            
+            # 验证WebSocket消息发送
+            assert len(mock_deps['websocket_manager'].sent_messages) >= 2
+            
+            # 验证AI服务被调用
+            assert mock_deps['ai_service'].call_count >= 1
+    
+    @pytest.mark.asyncio
+    async def test_process_task_not_found(self, task_processor):
+        """测试任务不存在的情况"""
+        # 配置Mock：任务不存在
+        task_processor.task_repo.get.return_value = None
+        
+        # 执行测试并验证异常
+        with pytest.raises(ValueError, match="任务不存在"):
+            await task_processor.process_task(999)
+    
+    @pytest.mark.asyncio
+    async def test_process_task_file_not_found(self, task_processor, mock_deps):
+        """测试文件不存在的情况"""
+        # 准备测试数据
+        task_id = 1
+        mock_task = mock_deps['task_repo'].create_mock_task(task_id=task_id)
+        
+        # 配置Mock：任务存在但文件不存在
+        task_processor.task_repo.get.return_value = mock_task
+        task_processor.file_repo.get_by_task_id.return_value = None
+        
+        # 执行测试
+        await task_processor.process_task(task_id)
+        
+        # 验证错误处理
+        task_processor.task_repo.update.assert_called_with(task_id, status="failed")
+        assert len(mock_deps['websocket_manager'].sent_messages) >= 1
+    
+    @pytest.mark.asyncio
+    async def test_process_task_ai_service_failure(self, task_processor, mock_deps):
+        """测试AI服务调用失败"""
+        # 准备测试数据
+        task_id = 1
+        mock_task = mock_deps['task_repo'].create_mock_task(task_id=task_id)
+        mock_file = mock_deps['file_repo'].create_mock_file(task_id=task_id)
+        
+        # 配置Mock：AI服务抛出异常
+        mock_ai_service = MockAIService()
+        mock_ai_service.set_failure(should_fail=True, fail_count=3)
+        task_processor.ai_service_factory.get_service.return_value = mock_ai_service
+        
+        # 配置其他依赖
+        task_processor.task_repo.get.return_value = mock_task
+        task_processor.file_repo.get_by_task_id.return_value = mock_file
+        task_processor.model_repo.get_by_id.return_value = Mock()
+        
+        # 创建模拟文件内容
+        with patch('builtins.open', mock_open(read_data='测试内容')):
+            # 执行测试
+            await task_processor.process_task(task_id)
+            
+            # 验证错误处理
+            task_processor.task_repo.update.assert_called_with(task_id, status="failed")
+    
+    @pytest.mark.asyncio
+    async def test_process_task_retry_mechanism(self, task_processor, mock_deps):
+        """测试任务重试机制"""
+        # 配置Mock：前两次失败，第三次成功
+        mock_ai_service = MockAIService()
+        mock_ai_service.set_failure(should_fail=True, fail_count=2)
+        task_processor.ai_service_factory.get_service.return_value = mock_ai_service
+        
+        # 准备测试数据
+        task_id = 1
+        mock_task = mock_deps['task_repo'].create_mock_task(task_id=task_id)
+        mock_file = mock_deps['file_repo'].create_mock_file(task_id=task_id)
+        
+        # 配置其他依赖
+        task_processor.task_repo.get.return_value = mock_task
+        task_processor.file_repo.get_by_task_id.return_value = mock_file
+        task_processor.model_repo.get_by_id.return_value = Mock()
+        
+        # 创建模拟文件内容
+        with patch('builtins.open', mock_open(read_data='测试内容')):
+            # 执行测试
+            await task_processor.process_task(task_id)
+            
+            # 验证重试次数（应该重试2次然后成功）
+            assert mock_ai_service.call_count == 3
+            # 验证任务最终状态为completed
+            task_processor.task_repo.update.assert_any_call(task_id, status="completed")
+    
+    @pytest.mark.asyncio
+    async def test_process_task_progress_updates(self, task_processor, mock_deps):
+        """测试任务进度更新"""
+        # 准备测试数据
+        task_id = 1
+        mock_task = mock_deps['task_repo'].create_mock_task(task_id=task_id)
+        mock_file = mock_deps['file_repo'].create_mock_file(task_id=task_id)
+        
+        # 配置依赖
+        task_processor.task_repo.get.return_value = mock_task
+        task_processor.file_repo.get_by_task_id.return_value = mock_file
+        task_processor.model_repo.get_by_id.return_value = Mock()
+        
+        # 创建模拟文件内容
+        with patch('builtins.open', mock_open(read_data='# 测试文档\n' + '测试内容\n' * 100)):
+            # 执行测试
+            await task_processor.process_task(task_id)
+            
+            # 验证进度更新消息发送
+            progress_messages = [
+                msg for msg in mock_deps['websocket_manager'].sent_messages 
+                if 'progress' in msg
+            ]
+            
+            # 应该有多次进度更新
+            assert len(progress_messages) >= 3
+            
+            # 验证进度值递增
+            progress_values = [msg['progress'] for msg in progress_messages]
+            assert all(0 <= p <= 100 for p in progress_values)
+
+
+# Mock open函数的辅助函数
+def mock_open(read_data=''):
+    """创建mock open函数"""
+    mock_file = Mock()
+    mock_file.__enter__ = Mock(return_value=Mock())
+    mock_file.__exit__ = Mock(return_value=None)
+    mock_file.__enter__.return_value.read = Mock(return_value=read_data)
+    return Mock(return_value=mock_file)

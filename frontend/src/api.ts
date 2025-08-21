@@ -1,8 +1,9 @@
 // API服务封装
 import axios from 'axios';
 import { Task, TaskDetail, AIOutput } from './types';
+import config from './config';
 
-const API_BASE = 'http://localhost:8080/api';
+const API_BASE = config.apiBaseUrl;
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -10,6 +11,29 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// 添加请求拦截器，自动添加认证头
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// 添加响应拦截器，处理认证错误
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // 认证失败，清除本地存储并跳转到登录页
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const taskAPI = {
   // 创建任务

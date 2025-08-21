@@ -1,0 +1,246 @@
+/* 紧凑版问题检测页面样式 */
+
+.issue-card-compact {
+  margin-bottom: 12px;
+  transition: all 0.3s ease;
+  border-left: 4px solid transparent;
+}
+
+.issue-card-compact.pending {
+  border-left-color: #1890ff;
+}
+
+.issue-card-compact.processed {
+  border-left-color: #52c41a;
+  background-color: #f6ffed;
+}
+
+.issue-card-compact.issue-severity-致命 {
+  border-color: #ff4d4f;
+}
+
+.issue-card-compact.issue-severity-严重 {
+  border-color: #fa8c16;
+}
+
+.issue-card-compact.issue-severity-一般 {
+  border-color: #fadb14;
+}
+
+.issue-card-compact.issue-severity-轻微 {
+  border-color: #52c41a;
+}
+
+.issue-header-compact {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.issue-main-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.issue-number {
+  font-weight: 600;
+  color: #1890ff;
+  font-size: 12px;
+  min-width: fit-content;
+}
+
+.issue-type-badge {
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #666;
+  font-weight: 500;
+  min-width: fit-content;
+}
+
+.issue-desc {
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.issue-actions-compact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.issue-preview {
+  margin: 8px 0;
+  padding: 6px 8px;
+  background: #fafafa;
+  border-radius: 4px;
+  border: 1px solid #e8e8e8;
+}
+
+.suggestion-preview {
+  margin: 8px 0;
+  padding: 6px 8px;
+  background: #f6ffed;
+  border-radius: 4px;
+  border: 1px solid #d9f7be;
+}
+
+.preview-label {
+  font-size: 11px;
+  margin-right: 6px;
+  font-weight: 600;
+}
+
+.preview-text, .suggestion-text {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.quick-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.details-section {
+  margin-top: 8px;
+}
+
+.details-collapse .ant-collapse-header {
+  padding: 6px 12px !important;
+  font-size: 12px;
+}
+
+.details-collapse .ant-collapse-content-box {
+  padding: 8px 12px !important;
+}
+
+.comparison-section {
+  margin-bottom: 16px;
+}
+
+.comparison-box {
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.comparison-header {
+  background: #fafafa;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+
+.comparison-content {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.more-info-content {
+  margin-top: 12px;
+}
+
+.info-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.info-item:last-child {
+  margin-bottom: 0;
+}
+
+.comment-section {
+  margin-top: 12px;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 6px;
+  border: 1px solid #e8e8e8;
+}
+
+.comment-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.comment-textarea {
+  margin-bottom: 8px;
+}
+
+.comment-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+  .issue-header-compact {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .issue-main-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .quick-actions .ant-space {
+    flex-wrap: wrap;
+  }
+}
+
+/* 状态动画 */
+.issue-card-compact.processed {
+  animation: fadeToProcessed 0.3s ease;
+}
+
+@keyframes fadeToProcessed {
+  from {
+    background-color: transparent;
+    border-left-color: #1890ff;
+  }
+  to {
+    background-color: #f6ffed;
+    border-left-color: #52c41a;
+  }
+}
+
+/* 快速操作按钮样式 */
+.quick-actions .ant-btn-primary {
+  background: #52c41a;
+  border-color: #52c41a;
+}
+
+.quick-actions .ant-btn-primary:hover {
+  background: #73d13d;
+  border-color: #73d13d;
+}
+
+.quick-actions .ant-btn-dangerous {
+  color: #ff4d4f;
+  border-color: #ff4d4f;
+}
+
+.quick-actions .ant-btn-dangerous:hover {
+  background: #ff4d4f;
+  border-color: #ff4d4f;
+  color: white;
+}

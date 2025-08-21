@@ -119,6 +119,22 @@ class Settings:
         return self.config.get('test_data', {})
     
     @property
+    def external_api_mock_config(self) -> Dict[str, Any]:
+        """外部API Mock配置"""
+        return self.config.get('external_api_mock', {})
+    
+    def get_mock_config(self, service_name: str) -> Dict[str, Any]:
+        """获取指定服务的Mock配置"""
+        return self.external_api_mock_config.get(service_name, {})
+    
+    def is_service_mocked(self, service_name: str) -> bool:
+        """检查指定服务是否需要mock（仅在测试模式下有效）"""
+        if not self.is_test_mode:
+            return False
+        mock_config = self.get_mock_config(service_name)
+        return mock_config.get('enabled', False)
+    
+    @property
     def server_config(self) -> Dict[str, Any]:
         """服务器配置"""
         return self.config.get('server', {

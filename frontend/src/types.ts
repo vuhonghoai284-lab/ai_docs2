@@ -52,3 +52,15 @@ export interface AIOutput {
   processing_time?: number;
   created_at: string;
 }
+
+export interface User {
+  id: number;
+  uid: string;
+  display_name?: string;
+  email?: string;
+  avatar_url?: string;
+  is_admin: boolean;
+  is_system_admin: boolean;
+  created_at: string;
+  last_login_at?: string;
+}

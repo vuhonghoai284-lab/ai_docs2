@@ -12,9 +12,18 @@ from app.core.config import get_settings
 settings = get_settings()
 
 # 创建数据库引擎
+sqlite_connect_args = {
+    "check_same_thread": False,
+    "timeout": 30,  # 30秒超时
+    "isolation_level": None  # 启用自动提交模式
+} if "sqlite" in settings.database_url else {}
+
 engine = create_engine(
     settings.database_url,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {}
+    connect_args=sqlite_connect_args,
+    pool_pre_ping=True,  # 预先检查连接有效性
+    pool_recycle=3600,   # 1小时后回收连接
+    max_overflow=20 if "sqlite" not in settings.database_url else 0  # SQLite不支持连接池
 )
 
 # 创建会话工厂

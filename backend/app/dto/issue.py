@@ -1,8 +1,8 @@
 """
 问题相关的DTO
 """
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
 
 
 class IssueResponse(BaseModel):
@@ -27,5 +27,5 @@ class IssueResponse(BaseModel):
 
 class FeedbackRequest(BaseModel):
     """反馈请求"""
-    feedback_type: str  # accept, reject
+    feedback_type: Literal["accept", "reject"] = Field(..., description="反馈类型，只能是 accept 或 reject")
     comment: Optional[str] = None

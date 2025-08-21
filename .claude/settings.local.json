@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python main.py)",
+      "Bash(python3:*)",
+      "Bash(npm start)",
+      "Bash(npm run:*)",
+      "Bash(sqlite3 app.db \".schema tasks\")",
+      "Bash(PYTHONPATH=. python3 backend/app/main.py)",
+      "Bash(curl -X POST \"http://localhost:8080/api/auth/thirdparty/login\" )",
+      "Bash(python -c \"\nfrom app.core.database import engine, Base\nfrom app.models.user import User\nfrom app.models.task import Task\nimport sqlite3\n\n# 测试数据库连接\nprint(''测试数据库连接...'')\ntry:\n    # 创建所有表\n    Base.metadata.create_all(bind=engine)\n    print(''✓ 数据库表创建成功'')\n    \n    # 检查用户表是否存在\n    with sqlite3.connect(''./data/app.db'') as conn:\n        cursor = conn.cursor()\n        cursor.execute(\"\"SELECT name FROM sqlite_master WHERE type=''table'' AND name=''users''\"\")\n        result = cursor.fetchone()\n        if result:\n            print(''✓ 用户表存在'')\n        else:\n            print(''✗ 用户表不存在'')\n            \n        # 查看用户表结构\n        cursor.execute(''PRAGMA table_info(users)'')\n        columns = cursor.fetchall()\n        print(''用户表列信息:'')\n        for col in columns:\n            print(f''  - {col[1]} ({col[2]})'')\n            \nexcept Exception as e:\n    print(f''✗ 数据库操作失败: {e}'')\n\")",
+      "Bash(python test_third_party_auth.py:*)",
+      "Bash(python app/main.py)",
+      "Bash(PYTHONPATH=/mnt/d/projects/ai_docs/ai_doc_test/backend python /mnt/d/projects/ai_docs/ai_doc_test/backend/app/main.py)",
+      "Bash(python test_improved_mock_mode.py)",
+      "Bash(curl:*)",
+      "Bash(PYTHONPATH=/mnt/d/projects/ai_docs/ai_doc_test/backend python app/main.py)",
+      "Bash(PYTHONPATH=/mnt/d/projects/ai_docs/ai_doc_test/backend CONFIG_FILE=config.test.yaml python app/main.py)",
+      "Bash(sqlite3:*)",
+      "Bash(python:*)",
+      "Bash(rm:*)",
+      "Bash(PYTHONPATH=. python app/main.py)",
+      "Bash(PYTHONPATH=. CONFIG_FILE=config.test.yaml python app/main.py)"
+    ],
+    "defaultMode": "acceptEdits"
+  }
+}

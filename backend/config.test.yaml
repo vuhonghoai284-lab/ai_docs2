@@ -15,6 +15,23 @@ database: ./data/test.db
 # 测试模式标志
 test_mode: true  # 启用测试模式
 
+# 外部API Mock配置（测试模式下生效）
+external_api_mock:
+  # 第三方用户认证API
+  third_party_auth:
+    enabled: true  # mock第三方认证API
+    mock_delay: 0.1  # 模拟API调用延迟（秒）
+  
+  # AI模型API
+  ai_models:
+    enabled: true  # mock AI模型API
+    mock_delay: 0.5  # 模拟AI调用延迟（秒）
+    
+  # 其他外部服务
+  external_services:
+    enabled: true  # mock其他外部服务
+    mock_delay: 0.2  # 模拟调用延迟（秒）
+
 # AI模型配置 - 测试模式
 ai_models:
   default_index: 0

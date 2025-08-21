@@ -28,9 +28,35 @@ class TaskResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
+    user_id: Optional[int] = None
+    file_id: Optional[int] = None
+    model_id: Optional[int] = None
     
     class Config:
         from_attributes = True
+    
+    @classmethod
+    def from_task_with_relations(cls, task, file_info=None, ai_model=None, issue_count: int = 0):
+        """从Task模型及其关联对象构建响应"""
+        return cls(
+            id=task.id,
+            title=task.title,
+            file_name=file_info.original_name if file_info else 'Unknown',
+            file_size=file_info.file_size if file_info else 0,
+            file_type=file_info.file_type if file_info else 'unknown',
+            status=task.status,
+            progress=task.progress,
+            issue_count=issue_count,
+            model_label=ai_model.label if ai_model else 'Unknown',
+            document_chars=file_info.document_chars if file_info else None,
+            processing_time=task.processing_time,
+            created_at=task.created_at,
+            completed_at=task.completed_at,
+            error_message=task.error_message,
+            user_id=task.user_id,
+            file_id=task.file_id,
+            model_id=task.model_id
+        )
         
 
 class TaskDetail(BaseModel):

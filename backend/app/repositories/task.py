@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.models import Task, Issue
+from app.repositories.interfaces.task_repository import ITaskRepository
 
 
-class TaskRepository:
+class TaskRepository(ITaskRepository):
     """任务仓库"""
     
     def __init__(self, db: Session):
@@ -33,6 +34,10 @@ class TaskRepository:
     def get_all(self) -> List[Task]:
         """获取所有任务"""
         return self.db.query(Task).order_by(Task.created_at.desc()).all()
+    
+    def get_by_user_id(self, user_id: int) -> List[Task]:
+        """根据用户ID获取任务"""
+        return self.db.query(Task).filter(Task.user_id == user_id).order_by(Task.created_at.desc()).all()
     
     def update(self, task_id: int, **kwargs) -> Optional[Task]:
         """更新任务"""
@@ -74,3 +79,12 @@ class TaskRepository:
     def count_issues(self, task_id: int) -> int:
         """统计任务的问题数量"""
         return self.db.query(Issue).filter(Issue.task_id == task_id).count()
+    
+    def update_status(self, task_id: int, status: str, progress: int = None) -> Task:
+        """更新任务状态和进度"""
+        update_data = {"status": status}
+        if progress is not None:
+            update_data["progress"] = progress
+        if status == "completed":
+            update_data["completed_at"] = datetime.utcnow()
+        return self.update(task_id, **update_data)

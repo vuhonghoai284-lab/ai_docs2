@@ -61,7 +61,10 @@ class LogService {
       return;
     }
 
-    const wsUrl = `ws://localhost:8080/ws/task/${taskId}/logs`;
+    // 动态获取WebSocket URL
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = import.meta.env.VITE_WS_BASE_URL?.replace(/^wss?:\/\//, '') || window.location.host;
+    const wsUrl = `${protocol}//${host}/ws/task/${taskId}/logs`;
     console.log('Connecting to WebSocket:', wsUrl);
 
     try {
@@ -354,7 +357,9 @@ class LogService {
    */
   async fetchHistory(taskId) {
     try {
-      const response = await fetch(`http://localhost:8080/api/tasks/${taskId}/logs/history`);
+      // 动态获取API URL
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.host}/api`;
+      const response = await fetch(`${apiBaseUrl}/tasks/${taskId}/logs/history`);
       if (!response.ok) {
         throw new Error('Failed to fetch log history');
       }

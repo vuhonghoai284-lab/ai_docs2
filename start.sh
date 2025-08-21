@@ -38,7 +38,7 @@ fi
 
 # 启动前端服务
 echo "启动前端服务..."
-npm start &
+npm run &
 FRONTEND_PID=$!
 cd ..
 

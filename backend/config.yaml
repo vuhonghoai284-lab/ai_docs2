@@ -87,6 +87,26 @@ cors:
   allow_methods: ["*"]
   allow_headers: ["*"]
 
+# 测试模式配置
+test_mode: false  # 全局测试模式开关
+
+# 外部API Mock配置（仅在测试模式下生效）
+external_api_mock:
+  # 第三方用户认证API
+  third_party_auth:
+    enabled: true  # 是否mock第三方认证API
+    mock_delay: 0.1  # 模拟API调用延迟（秒）
+  
+  # AI模型API
+  ai_models:
+    enabled: true  # 是否mock AI模型API
+    mock_delay: 0.5  # 模拟AI调用延迟（秒）
+    
+  # 其他外部服务
+  external_services:
+    enabled: true  # 是否mock其他外部服务
+    mock_delay: 0.2  # 模拟调用延迟（秒）
+
 # 环境变量映射（可选）
 env_mapping:
   OPENAI_API_KEY: "OPENAI_API_KEY"

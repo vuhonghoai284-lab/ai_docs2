@@ -22,13 +22,13 @@ def test_get_models(client: TestClient):
     assert isinstance(data["models"], list)
 
 
-def test_create_task(client: TestClient, sample_file):
+def test_create_task(client: TestClient, sample_file, auth_headers):
     """测试创建任务"""
     filename, content, content_type = sample_file
     files = {"file": (filename, content, content_type)}
     data = {"title": "Test Task", "model_index": 0}
     
-    response = client.post("/api/tasks", files=files, data=data)
+    response = client.post("/api/tasks", files=files, data=data, headers=auth_headers)
     assert response.status_code == 200
     task = response.json()
     assert task["title"] == "Test Task"
@@ -37,24 +37,24 @@ def test_create_task(client: TestClient, sample_file):
     return task["id"]
 
 
-def test_get_tasks(client: TestClient):
+def test_get_tasks(client: TestClient, auth_headers):
     """测试获取任务列表"""
-    response = client.get("/api/tasks")
+    response = client.get("/api/tasks", headers=auth_headers)
     assert response.status_code == 200
     tasks = response.json()
     assert isinstance(tasks, list)
 
 
-def test_get_task_detail(client: TestClient, sample_file):
+def test_get_task_detail(client: TestClient, sample_file, auth_headers):
     """测试获取任务详情"""
     # 先创建一个任务
     filename, content, content_type = sample_file
     files = {"file": (filename, content, content_type)}
-    create_response = client.post("/api/tasks", files=files)
+    create_response = client.post("/api/tasks", files=files, headers=auth_headers)
     task_id = create_response.json()["id"]
     
     # 获取任务详情
-    response = client.get(f"/api/tasks/{task_id}")
+    response = client.get(f"/api/tasks/{task_id}", headers=auth_headers)
     assert response.status_code == 200
     detail = response.json()
     assert "task" in detail
@@ -62,7 +62,7 @@ def test_get_task_detail(client: TestClient, sample_file):
     assert detail["task"]["id"] == task_id
 
 
-def test_submit_feedback(client: TestClient):
+def test_submit_feedback(client: TestClient, auth_headers):
     """测试提交问题反馈"""
     # 这个测试需要先有问题数据，这里只测试API是否可调用
     feedback_data = {
@@ -70,38 +70,38 @@ def test_submit_feedback(client: TestClient):
         "comment": "测试评论"
     }
     # 使用一个不存在的ID会返回404
-    response = client.put("/api/issues/999/feedback", json=feedback_data)
+    response = client.put("/api/issues/999/feedback", json=feedback_data, headers=auth_headers)
     assert response.status_code == 404
 
 
-def test_get_ai_outputs(client: TestClient, sample_file):
+def test_get_ai_outputs(client: TestClient, sample_file, auth_headers):
     """测试获取AI输出"""
     # 先创建一个任务
     filename, content, content_type = sample_file
     files = {"file": (filename, content, content_type)}
-    create_response = client.post("/api/tasks", files=files)
+    create_response = client.post("/api/tasks", files=files, headers=auth_headers)
     task_id = create_response.json()["id"]
     
     # 获取AI输出
-    response = client.get(f"/api/tasks/{task_id}/ai-outputs")
+    response = client.get(f"/api/tasks/{task_id}/ai-outputs", headers=auth_headers)
     assert response.status_code == 200
     outputs = response.json()
     assert isinstance(outputs, list)
 
 
-def test_delete_task(client: TestClient, sample_file):
+def test_delete_task(client: TestClient, sample_file, auth_headers):
     """测试删除任务"""
     # 先创建一个任务
     filename, content, content_type = sample_file
     files = {"file": (filename, content, content_type)}
-    create_response = client.post("/api/tasks", files=files)
+    create_response = client.post("/api/tasks", files=files, headers=auth_headers)
     task_id = create_response.json()["id"]
     
     # 删除任务
-    response = client.delete(f"/api/tasks/{task_id}")
+    response = client.delete(f"/api/tasks/{task_id}", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["success"] == True
     
     # 验证任务已删除
-    response = client.get(f"/api/tasks/{task_id}")
+    response = client.get(f"/api/tasks/{task_id}", headers=auth_headers)
     assert response.status_code == 404
