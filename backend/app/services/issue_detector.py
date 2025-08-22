@@ -4,7 +4,7 @@ import re
 import time
 import logging
 import asyncio
-from typing import List, Dict, Optional, Callable
+from typing import List, Dict, Optional, Callable, Any
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 try:
@@ -474,3 +474,41 @@ class IssueDetector:
                 self.content = json.dumps(content, ensure_ascii=False, indent=2)
         
         return MockResponse(mock_response)
+    
+    async def analyze_document(self, text: str, prompt_type: str = "detect_issues") -> Dict[str, Any]:
+        """
+        统一的文档分析接口，兼容task_processor的调用
+        
+        Args:
+            text: 文档文本内容
+            prompt_type: 提示类型，对于IssueDetector仅支持"detect_issues"
+            
+        Returns:
+            分析结果
+        """
+        if prompt_type != "detect_issues":
+            raise ValueError(f"IssueDetector只支持detect_issues类型，收到: {prompt_type}")
+        
+        # 将文本转换为章节格式，以便调用detect_issues方法
+        sections = [{"section_title": "文档内容", "content": text, "level": 1}]
+        
+        # 调用问题检测方法
+        issues = await self.detect_issues(sections)
+        
+        # 构建返回格式，兼容task_processor的期望
+        return {
+            "status": "success",
+            "data": {
+                "issues": issues,
+                "summary": {
+                    "total_issues": len(issues),
+                    "critical": sum(1 for i in issues if i.get("severity") == "致命"),
+                    "major": sum(1 for i in issues if i.get("severity") == "严重"),
+                    "normal": sum(1 for i in issues if i.get("severity") == "一般"),
+                    "minor": sum(1 for i in issues if i.get("severity") == "提示")
+                }
+            },
+            "raw_output": json.dumps({"issues": issues}, ensure_ascii=False, indent=2),
+            "tokens_used": 200,  # 估算值
+            "processing_time": 2.0  # 估算值
+        }

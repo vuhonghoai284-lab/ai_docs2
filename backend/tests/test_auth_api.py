@@ -17,8 +17,14 @@ class TestAuthAPI:
         data = response.json()
         assert "auth_url" in data
         assert isinstance(data["auth_url"], str)
-        assert "uniportal.huawei.com" in data["auth_url"]
-        assert "oauth2/authorize" in data["auth_url"]
+        
+        # 验证URL包含必要的OAuth2参数
+        auth_url = data["auth_url"]
+        assert "oauth2/authorize" in auth_url
+        assert "client_id=" in auth_url
+        assert "response_type=code" in auth_url
+        assert "redirect_url=" in auth_url
+        assert "scope=" in auth_url
     
     def test_third_party_login_success(self, client: TestClient):
         """测试第三方登录成功 - AUTH-002"""

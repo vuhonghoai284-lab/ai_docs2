@@ -3,6 +3,7 @@ import { Card, Upload, Button, Input, message, Progress, Space, Tag, Select, Too
 import { InboxOutlined, LoadingOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { taskAPI } from '../api';
 import { useNavigate } from 'react-router-dom';
+import config from '../config';
 
 const { Dragger } = Upload;
 const { Option } = Select;
@@ -33,7 +34,7 @@ const TaskCreate: React.FC = () => {
     // 获取可用模型列表
     const fetchModels = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/models');
+        const response = await fetch(`${config.apiBaseUrl}/models`);
         const data = await response.json();
         setModels(data.models);
         setSelectedModel(data.default_index);

@@ -25,6 +25,9 @@ from app.models.task import Task
 from app.models.ai_model import AIModel
 from app.models.file_info import FileInfo
 
+# 导入DTO类
+from app.dto.user import UserCreate
+
 # 创建内存测试数据库 - 使用StaticPool确保所有连接使用同一个内存数据库
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(

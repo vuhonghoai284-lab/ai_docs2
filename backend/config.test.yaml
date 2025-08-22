@@ -115,6 +115,30 @@ cors:
   allow_methods: ["*"]
   allow_headers: ["*"]
 
+# 第三方登录配置 - 测试模式
+third_party_auth:
+  # OAuth2配置 - 测试模式下使用mock值
+  client_id: "test_client_id"
+  client_secret: "test_client_secret"
+  redirect_url: "http://localhost:3000/callback"
+  scope: "base.profile"
+  
+  # API端点配置 - 测试模式下使用mock端点
+  api_endpoints:
+    authorization_url: "http://mock-auth-provider.com/oauth2/authorize"
+    token_url: "http://mock-auth-provider.com/oauth2/accesstoken"
+    userinfo_url: "http://mock-auth-provider.com/oauth2/userinfo"
+  
+  # 超时和重试配置
+  request_timeout: 30
+  max_retries: 3
+
+# JWT配置 - 测试模式
+jwt:
+  secret_key: "test_jwt_secret_key_for_testing_only"
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+
 # 测试数据配置
 test_data:
   # 模拟的问题类型和数量

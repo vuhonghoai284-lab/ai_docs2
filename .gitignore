@@ -45,6 +45,7 @@ yarn-error.log*
 # Uploaded files and reports
 backend/uploads/
 backend/reports/
+backend/data/
 
 # IDE
 .vscode/

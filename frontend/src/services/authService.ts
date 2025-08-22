@@ -1,8 +1,9 @@
 // 认证服务
 import axios from 'axios';
 import { User } from '../types';
+import config from '../config';
 
-const API_BASE = 'http://localhost:8080/api';
+const API_BASE = config.apiBaseUrl;
 
 const api = axios.create({
   baseURL: API_BASE,

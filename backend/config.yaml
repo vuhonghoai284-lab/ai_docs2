@@ -107,8 +107,48 @@ external_api_mock:
     enabled: true  # 是否mock其他外部服务
     mock_delay: 0.2  # 模拟调用延迟（秒）
 
+# 第三方登录配置
+third_party_auth:
+  # OAuth2配置
+  client_id: "${THIRD_PARTY_CLIENT_ID}"  # 从环境变量获取
+  client_secret: "${THIRD_PARTY_CLIENT_SECRET}"  # 从环境变量获取
+  redirect_url: "${THIRD_PARTY_REDIRECT_URL}"  # 从环境变量获取
+  scope: "base.profile"
+  
+  # API端点配置
+  api_endpoints:
+    authorization_url: "${THIRD_PARTY_AUTH_URL}"  # 授权页面URL
+    token_url: "${THIRD_PARTY_TOKEN_URL}"  # 获取token的API
+    userinfo_url: "${THIRD_PARTY_USERINFO_URL}"  # 获取用户信息的API
+  
+  # 超时和重试配置
+  request_timeout: 30  # 请求超时时间（秒）
+  max_retries: 3  # 最大重试次数
+  
+  # 示例值（用于文档说明）
+  # 实际配置应该通过环境变量设置：
+  # THIRD_PARTY_CLIENT_ID=your_client_id
+  # THIRD_PARTY_CLIENT_SECRET=your_client_secret  
+  # THIRD_PARTY_REDIRECT_URL=https://your-domain.com/callback
+  # THIRD_PARTY_AUTH_URL=https://auth-provider.com/oauth2/authorize
+  # THIRD_PARTY_TOKEN_URL=https://auth-provider.com/oauth2/accesstoken
+  # THIRD_PARTY_USERINFO_URL=https://auth-provider.com/oauth2/userinfo
+
+# JWT配置
+jwt:
+  secret_key: "${JWT_SECRET_KEY}"  # 从环境变量获取
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+  
 # 环境变量映射（可选）
 env_mapping:
   OPENAI_API_KEY: "OPENAI_API_KEY"
   ANTHROPIC_API_KEY: "ANTHROPIC_AUTH_TOKEN"
   ANTHROPIC_BASE_URL: "ANTHROPIC_BASE_URL"
+  JWT_SECRET_KEY: "JWT_SECRET_KEY"
+  THIRD_PARTY_CLIENT_ID: "THIRD_PARTY_CLIENT_ID"
+  THIRD_PARTY_CLIENT_SECRET: "THIRD_PARTY_CLIENT_SECRET"
+  THIRD_PARTY_REDIRECT_URL: "THIRD_PARTY_REDIRECT_URL"
+  THIRD_PARTY_AUTH_URL: "THIRD_PARTY_AUTH_URL"
+  THIRD_PARTY_TOKEN_URL: "THIRD_PARTY_TOKEN_URL"
+  THIRD_PARTY_USERINFO_URL: "THIRD_PARTY_USERINFO_URL"

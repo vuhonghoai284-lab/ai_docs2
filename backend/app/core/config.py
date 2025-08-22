@@ -144,6 +144,20 @@ class Settings:
             'reload': False
         })
     
+    @property
+    def third_party_auth_config(self) -> Dict[str, Any]:
+        """第三方登录配置"""
+        return self.config.get('third_party_auth', {})
+    
+    @property
+    def jwt_config(self) -> Dict[str, Any]:
+        """JWT配置"""
+        return self.config.get('jwt', {
+            'secret_key': 'ai_doc_test_secret_key',
+            'algorithm': 'HS256',
+            'access_token_expire_minutes': 30
+        })
+    
     def reload(self, config_file: Optional[str] = None):
         """重新加载配置"""
         if config_file:

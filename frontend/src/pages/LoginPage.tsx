@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Form, Input, Card, message, Tabs, Space } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { loginWithThirdParty, loginWithSystem } from '../services/authService';
+import config from '../config';
 
 const { TabPane } = Tabs;
 
@@ -47,7 +48,7 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     try {
       // 1. 获取第三方认证URL
-      const response = await fetch('http://localhost:8080/api/auth/thirdparty/url');
+      const response = await fetch(`${config.apiBaseUrl}/auth/thirdparty/url`);
       const { auth_url } = await response.json();
       
       // 2. 检查是否是开发/测试环境

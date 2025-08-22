@@ -21,9 +21,13 @@ class AuthService(IAuthService):
         self.user_repo = UserRepository(db)
         self.settings = get_settings()
         # JWT密钥和过期时间配置
-        self.SECRET_KEY = "ai_doc_test_secret_key"  # 在生产环境中应该从配置文件读取
-        self.ALGORITHM = "HS256"
-        self.ACCESS_TOKEN_EXPIRE_MINUTES = 30
+        jwt_config = self.settings.jwt_config
+        self.SECRET_KEY = jwt_config.get("secret_key", "ai_doc_test_secret_key")
+        self.ALGORITHM = jwt_config.get("algorithm", "HS256")
+        self.ACCESS_TOKEN_EXPIRE_MINUTES = jwt_config.get("access_token_expire_minutes", 30)
+        
+        # 第三方认证配置
+        self.third_party_config = self.settings.third_party_auth_config
     
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):
         """创建访问令牌"""
@@ -143,14 +147,18 @@ class AuthService(IAuthService):
         """使用authorization code交换access token"""
         import httpx
         
-        # 构建请求参数（与生产环境完全一致）
+        # 从配置获取参数
         payload = {
-            "client_id": "xyl",
-            "client_secret": "your_client_secret_here",  # 应该从环境变量获取
-            "redirect_url": "https://actp.ascend.huawei.com/callback",
+            "client_id": self.third_party_config.get("client_id"),
+            "client_secret": self.third_party_config.get("client_secret"),
+            "redirect_url": self.third_party_config.get("redirect_url"),
             "grant_type": "authorization_code",
             "code": code
         }
+        
+        # 验证必需的配置
+        if not payload["client_id"] or not payload["client_secret"] or not payload["redirect_url"]:
+            raise ValueError("第三方登录配置不完整，请检查client_id、client_secret和redirect_url配置")
         
         headers = {
             "Content-Type": "application/json"
@@ -194,24 +202,35 @@ class AuthService(IAuthService):
         
         # 生产环境或非mock模式：真实的API调用
         import httpx
+        # 从配置获取API端点和超时设置
+        api_endpoints = self.third_party_config.get("api_endpoints", {})
+        token_url = api_endpoints.get("token_url")
+        timeout = self.third_party_config.get("request_timeout", 30)
+        
+        if not token_url:
+            raise ValueError("第三方登录token_url配置缺失")
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                "https://uniportal.huawei.com/sasslogin1/oauth2/accesstoken",
+                token_url,
                 json=payload,
                 headers=headers,
-                timeout=30.0
+                timeout=float(timeout)
             )
             response.raise_for_status()
             return response.json()
     
     async def get_third_party_user_info(self, access_token: str) -> ThirdPartyUserInfoResponse:
         """使用access token获取用户信息"""
-        # 构建请求参数（与生产环境完全一致）
+        # 从配置构建请求参数
         payload = {
-            "client_id": "xyl",
+            "client_id": self.third_party_config.get("client_id"),
             "access_token": access_token,
-            "scope": "base.profile"
+            "scope": self.third_party_config.get("scope", "base.profile")
         }
+        
+        if not payload["client_id"]:
+            raise ValueError("第三方登录client_id配置缺失")
         
         # 执行HTTP调用（仅在此处进行mock判断）
         try:
@@ -253,22 +272,41 @@ class AuthService(IAuthService):
         
         # 生产环境或非mock模式：真实的API调用
         import httpx
+        # 从配置获取API端点和超时设置
+        api_endpoints = self.third_party_config.get("api_endpoints", {})
+        userinfo_url = api_endpoints.get("userinfo_url")
+        timeout = self.third_party_config.get("request_timeout", 30)
+        
+        if not userinfo_url:
+            raise ValueError("第三方登录userinfo_url配置缺失")
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                "https://uniportal.huawei.com/sasslogin1/oauth2/userinfo",
+                userinfo_url,
                 json=payload,
-                timeout=30.0
+                timeout=float(timeout)
             )
             response.raise_for_status()
             return response.json()
     
     def get_authorization_url(self, state: str = "12345678") -> str:
         """获取第三方认证授权URL"""
+        # 从配置获取参数
+        api_endpoints = self.third_party_config.get("api_endpoints", {})
+        auth_url = api_endpoints.get("authorization_url")
+        client_id = self.third_party_config.get("client_id")
+        redirect_url = self.third_party_config.get("redirect_url")
+        scope = self.third_party_config.get("scope", "base.profile")
+        
+        # 验证必需的配置
+        if not auth_url or not client_id or not redirect_url:
+            raise ValueError("第三方登录配置不完整，请检查authorization_url、client_id和redirect_url配置")
+        
         return (
-            "https://uniportal.huawei.com/sasslogin1/oauth2/authorize?"
-            "client_id=xyl&response_type=code&"
-            "redirect_url=https://actp.ascend.huawei.com/callback&"
-            "scope=base.profile&display=page&"
+            f"{auth_url}?"
+            f"client_id={client_id}&response_type=code&"
+            f"redirect_url={redirect_url}&"
+            f"scope={scope}&display=page&"
             f"state={state}"
         )
     

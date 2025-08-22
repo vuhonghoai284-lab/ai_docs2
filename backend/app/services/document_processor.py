@@ -4,7 +4,7 @@ import re
 import time
 import logging
 import asyncio
-from typing import List, Dict, Optional, Callable
+from typing import List, Dict, Optional, Callable, Any
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 try:
@@ -374,3 +374,35 @@ class DocumentProcessor:
                 self.content = json.dumps(content, ensure_ascii=False, indent=2)
         
         return MockResponse(mock_response)
+    
+    async def analyze_document(self, text: str, prompt_type: str = "preprocess") -> Dict[str, Any]:
+        """
+        统一的文档分析接口，兼容task_processor的调用
+        
+        Args:
+            text: 文档文本内容
+            prompt_type: 提示类型，对于DocumentProcessor仅支持"preprocess"
+            
+        Returns:
+            分析结果
+        """
+        if prompt_type != "preprocess":
+            raise ValueError(f"DocumentProcessor只支持preprocess类型，收到: {prompt_type}")
+        
+        # 调用预处理方法
+        sections = await self.preprocess_document(text)
+        
+        # 构建返回格式，兼容task_processor的期望
+        return {
+            "status": "success",
+            "data": {
+                "document_type": "技术文档",
+                "structure": {
+                    "total_sections": len(sections),
+                    "sections": sections
+                }
+            },
+            "raw_output": json.dumps({"sections": sections}, ensure_ascii=False, indent=2),
+            "tokens_used": 100,  # 估算值
+            "processing_time": 1.0  # 估算值
+        }

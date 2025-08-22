@@ -60,3 +60,8 @@
 
 
     │ > 请修改前后端测试模式流程，仅在需要真实调用外部API时进行mock模拟数据返回，业务代码流程和正式环境保持一致，确保测试模式能完全模拟生产环境
+
+
+    有如下几个bug请修复下，修复完成请添加相关测试用例，并执行全量用例，确保用例全部通过：1、DocumentProcess object has no attribute 
+  'analyze_document';2、前端代码存在localhost:8080 
+  API调用硬编码，请统一修改从配置或环境变量获取；3、将第三方登录相关url、key等配置加入到config.yaml中进行加载

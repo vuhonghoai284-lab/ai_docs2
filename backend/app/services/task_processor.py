@@ -71,18 +71,30 @@ class TaskProcessor:
             ai_services = self.ai_service_factory.get_service_for_model(self.settings.default_model_index, self.settings)
             
             # 根据测试模式选择合适的服务
-            if self.settings.is_test_mode and 'mock_service' in ai_services:
-                ai_service = ai_services['mock_service']
+            if self.settings.is_test_mode and 'mock_service' in ai_services and ai_services['mock_service']:
+                document_processor = ai_services['mock_service']
+                issue_detector = ai_services['mock_service']
             else:
-                # 这里需要根据实际情况选择document_processor或其他服务
-                ai_service = ai_services.get('document_processor') or ai_services.get('mock_service')
+                # 获取真实的AI服务组件
+                document_processor = ai_services.get('document_processor')
+                issue_detector = ai_services.get('issue_detector')
+                
+                # 如果真实服务不可用，降级到mock服务
+                if not document_processor or not issue_detector:
+                    if ai_services.get('mock_service'):
+                        document_processor = ai_services['mock_service']
+                        issue_detector = ai_services['mock_service']
+                    else:
+                        raise ValueError("无法获取AI服务")
             
-            if not ai_service:
+            if not document_processor or not issue_detector:
                 raise ValueError("无法获取AI服务")
             
             # 如果是Mock服务，设置WebSocket上下文
-            if hasattr(ai_service, 'set_context'):
-                await ai_service.set_context(task_id, manager)
+            if hasattr(document_processor, 'set_context'):
+                await document_processor.set_context(task_id, manager)
+            if hasattr(issue_detector, 'set_context'):
+                await issue_detector.set_context(task_id, manager)
             
             # 读取文件内容
             file_path = None
@@ -108,7 +120,7 @@ class TaskProcessor:
             self.task_repo.update(task_id, progress=30)
             await manager.send_progress(task_id, 30, "文档预处理")
             await self._log(task_id, "INFO", "开始文档预处理", "文档预处理", 30)
-            preprocess_result = await ai_service.analyze_document(
+            preprocess_result = await document_processor.analyze_document(
                 file_content, 
                 prompt_type="preprocess"
             )
@@ -125,7 +137,7 @@ class TaskProcessor:
             self.task_repo.update(task_id, progress=60)
             await manager.send_progress(task_id, 60, "问题检测")
             await self._log(task_id, "INFO", "开始检测文档问题", "问题检测", 60)
-            issues_result = await ai_service.analyze_document(
+            issues_result = await issue_detector.analyze_document(
                 file_content,
                 prompt_type="detect_issues"
             )
