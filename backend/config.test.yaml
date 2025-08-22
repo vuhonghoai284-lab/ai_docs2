@@ -120,7 +120,11 @@ third_party_auth:
   # OAuth2配置 - 测试模式下使用mock值
   client_id: "test_client_id"
   client_secret: "test_client_secret"
-  redirect_url: "http://localhost:3000/callback"
+  
+  # 动态重定向URL配置 - 支持前端域名/IP端口配置
+  frontend_domain: "http://localhost:5173"  # 前端域名，测试环境固定
+  redirect_path: "/callback"  # 回调路径，固定为/callback
+  
   scope: "base.profile"
   
   # API端点配置 - 测试模式下使用mock端点

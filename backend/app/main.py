@@ -6,7 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import engine, get_db, Base
-from app.views import system_view, auth_view, task_view, user_view, ai_output_view, issue_view, task_log_view
+from app.views import system_view, auth_view, task_view, user_view, ai_output_view, issue_view, task_log_view, analytics_view
+
+# 导入所有模型以确保它们被注册到Base.metadata
+from app.models import *
 
 # 获取配置
 settings = get_settings()
@@ -25,9 +28,28 @@ def create_app() -> FastAPI:
     )
     
     # 配置CORS
+    cors_origins = settings.cors_origins
+    
+    # 开发模式或端口不是8080时，允许更宽松的CORS
+    server_port = settings.server_config.get('port', 8080)
+    if server_port != 8080 or settings.server_config.get('debug', False):
+        print(f"💡 检测到非标准端口({server_port})或调试模式，启用宽松CORS策略")
+        # 添加当前服务器端口的前端地址
+        additional_origins = [
+            f"http://localhost:3000",
+            f"http://localhost:5173", 
+            f"http://127.0.0.1:3000",
+            f"http://127.0.0.1:5173"
+        ]
+        for origin in additional_origins:
+            if origin not in cors_origins:
+                cors_origins.append(origin)
+    
+    print(f"🌐 CORS允许的源: {cors_origins}")
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -42,21 +64,18 @@ def setup_startup_event(app: FastAPI):
     """设置应用启动事件"""
     @app.on_event("startup")
     async def startup_event():
-        """应用启动时的初始化操作"""
-        # 在测试模式下跳过启动初始化
-        if settings.is_test_mode:
-            print("✓ 测试模式，跳过启动初始化")
-            return
-            
+        """应用启动时的初始化操作"""        
         from app.services.model_initializer import model_initializer
         
-        # 初始化AI模型配置到数据库
+        # 初始化AI模型配置到数据库（测试模式下也需要）
         db = next(get_db())
         try:
             models = model_initializer.initialize_models(db)
-            print(f"✓ 已初始化 {len(models)} 个AI模型")
+            mode_text = "测试模式" if settings.is_test_mode else "生产模式"
+            print(f"✓ {mode_text} - 已初始化 {len(models)} 个AI模型")
         except Exception as e:
-            print(f"✗ AI模型初始化失败: {e}")
+            mode_text = "测试模式" if settings.is_test_mode else "生产模式"
+            print(f"✗ {mode_text} - AI模型初始化失败: {e}")
         finally:
             db.close()
 
@@ -97,6 +116,9 @@ def setup_routes(app: FastAPI):
     
     # 注册任务日志相关路由
     app.include_router(task_log_view.router, prefix="/api/tasks", tags=["任务日志"])
+    
+    # 注册运营数据统计相关路由
+    app.include_router(analytics_view.router, tags=["运营数据统计"])
 
 # 设置路由
 setup_routes(app)
@@ -105,4 +127,8 @@ setup_routes(app)
 if __name__ == "__main__":
     import uvicorn
     print("启动服务器...")
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    # 从配置获取服务器端口
+    server_config = settings.server_config
+    host = server_config.get('host', '0.0.0.0')
+    port = server_config.get('port', 8080)
+    uvicorn.run(app, host=host, port=port)

@@ -25,7 +25,11 @@ class SystemView:
         self.router.add_api_route("/", self.root, methods=["GET"])
         self.router.add_api_route("/api/config", self.get_client_config, methods=["GET"])
         self.router.add_api_route("/api/models", self.get_models, methods=["GET"], response_model=ModelsResponse)
-        self.router.add_websocket_route("/ws/task/{task_id}/logs", self.websocket_endpoint)
+        
+        # 使用装饰器方式注册WebSocket路由，避免参数传递问题
+        @self.router.websocket("/ws/task/{task_id}/logs")
+        async def websocket_handler(websocket: WebSocket, task_id: int):
+            return await self.websocket_endpoint(websocket, task_id)
     
     def root(self):
         """根路径"""

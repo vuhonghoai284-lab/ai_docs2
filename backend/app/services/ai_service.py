@@ -11,18 +11,18 @@ from app.services.realtime_logger import TaskLoggerAdapter
 class AIService:
     """AI服务统一接口 - 提供与原有ai_service.py兼容的接口"""
     
-    def __init__(self, db_session: Optional[Session] = None, model_index: Optional[int] = None, settings=None):
+    def __init__(self, db_session: Optional[Session] = None, ai_model_index: Optional[int] = None, settings=None):
         """
         初始化AI服务
         
         Args:
             db_session: 数据库会话
-            model_index: 模型索引
+            ai_model_index: 模型索引
             settings: 设置对象
         """
         self.db = db_session
         self.settings = settings
-        self.model_index = model_index or (settings.default_model_index if settings else 0)
+        self.ai_model_index = ai_model_index or (settings.default_model_index if settings else 0)
         
         # 初始化日志
         self.logger = logging.getLogger(f"ai_service.{id(self)}")
@@ -39,7 +39,7 @@ class AIService:
         # 获取AI服务组件
         if settings:
             self.services = ai_service_factory.get_service_for_model(
-                self.model_index, 
+                self.ai_model_index, 
                 settings, 
                 db_session
             )
@@ -51,7 +51,7 @@ class AIService:
                 'issue_detector': None
             }
         
-        self.logger.info(f"🤖 AI服务初始化完成，模型索引: {self.model_index}")
+        self.logger.info(f"🤖 AI服务初始化完成，模型索引: {self.ai_model_index}")
         
         # 检查服务状态
         if self.services.get('document_processor') and self.services.get('issue_detector'):

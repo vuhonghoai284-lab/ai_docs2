@@ -52,13 +52,33 @@ class Settings:
             for key, value in config.items():
                 if isinstance(value, str) and value.startswith('${') and value.endswith('}'):
                     env_var = value[2:-1]
-                    config[key] = os.getenv(env_var, value)
+                    default_value = self._get_default_value(env_var, value)
+                    config[key] = os.getenv(env_var, default_value)
                 elif isinstance(value, (dict, list)):
                     self._replace_env_vars(value)
         elif isinstance(config, list):
             for item in config:
                 if isinstance(item, (dict, list)):
                     self._replace_env_vars(item)
+    
+    def _get_default_value(self, env_var: str, original_value: str) -> str:
+        """为环境变量提供测试模式下的默认值"""
+        # 测试模式下的默认值映射
+        test_defaults = {
+            'THIRD_PARTY_CLIENT_ID': 'test_client_id',
+            'THIRD_PARTY_CLIENT_SECRET': 'test_client_secret',
+            'FRONTEND_DOMAIN': 'http://localhost:5173',
+            'THIRD_PARTY_AUTH_URL': 'http://mock-auth-provider.com/oauth2/authorize',
+            'THIRD_PARTY_TOKEN_URL': 'http://mock-auth-provider.com/oauth2/accesstoken',
+            'THIRD_PARTY_USERINFO_URL': 'http://mock-auth-provider.com/oauth2/userinfo'
+        }
+        
+        # 如果是测试模式，返回测试默认值
+        if self.config_file == "config.test.yaml" or self._test_mode:
+            return test_defaults.get(env_var, original_value)
+        
+        # 生产模式下，如果环境变量不存在，返回空字符串而不是原始占位符
+        return ""
     
     @property
     def is_test_mode(self) -> bool:
@@ -104,14 +124,47 @@ class Settings:
     def cors_origins(self) -> List[str]:
         """CORS允许的源"""
         cors_config = self.config.get('cors', {})
-        if cors_config.get('enabled', True):
-            return cors_config.get('origins', [
-                "http://localhost:3000", 
-                "http://localhost:5173", 
-                "http://127.0.0.1:3000", 
+        if not cors_config.get('enabled', True):
+            return []
+        
+        origins = cors_config.get('origins', [
+            "http://localhost:3000", 
+            "http://localhost:5173", 
+            "http://127.0.0.1:3000", 
+            "http://127.0.0.1:5173"
+        ])
+        
+        # 过滤掉空值和环境变量占位符
+        filtered_origins = []
+        for origin in origins:
+            if origin and not origin.startswith("${") and origin != "null":
+                filtered_origins.append(origin)
+            elif origin.startswith("${") and origin.endswith("}"):
+                # 处理环境变量
+                env_var = origin[2:-1].split(":")[0]  # 获取环境变量名，忽略默认值
+                env_value = os.getenv(env_var)
+                if env_value and env_value != "null":
+                    filtered_origins.append(env_value)
+        
+        # 开发模式：允许更宽松的CORS
+        development_mode = cors_config.get('development_mode', False)
+        if isinstance(development_mode, str):
+            development_mode = development_mode.lower() in ['true', '1', 'yes']
+        
+        if development_mode or os.getenv('CORS_DEVELOPMENT_MODE', '').lower() in ['true', '1', 'yes']:
+            # 开发模式下添加常用的开发地址模式
+            dev_origins = [
+                "http://localhost:3000",
+                "http://localhost:3001", 
+                "http://localhost:5173",
+                "http://127.0.0.1:3000",
                 "http://127.0.0.1:5173"
-            ])
-        return []
+            ]
+            for dev_origin in dev_origins:
+                if dev_origin not in filtered_origins:
+                    filtered_origins.append(dev_origin)
+        
+        return filtered_origins
     
     @property
     def test_data_config(self) -> Dict[str, Any]:

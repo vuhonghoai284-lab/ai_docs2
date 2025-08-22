@@ -1,7 +1,7 @@
 """
 任务相关的DTO（数据传输对象）
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -9,7 +9,9 @@ from datetime import datetime
 class TaskCreate(BaseModel):
     """创建任务请求"""
     title: Optional[str] = None
-    model_index: Optional[int] = None
+    ai_model_index: Optional[int] = None
+    
+    model_config = ConfigDict(protected_namespaces=())
     
 
 class TaskResponse(BaseModel):
@@ -22,7 +24,8 @@ class TaskResponse(BaseModel):
     status: str
     progress: float
     issue_count: Optional[int] = None
-    model_label: Optional[str] = None
+    processed_issues: Optional[int] = None
+    ai_model_label: Optional[str] = None
     document_chars: Optional[int] = None
     processing_time: Optional[float] = None
     created_at: datetime
@@ -30,13 +33,12 @@ class TaskResponse(BaseModel):
     error_message: Optional[str] = None
     user_id: Optional[int] = None
     file_id: Optional[int] = None
-    model_id: Optional[int] = None
+    ai_model_id: Optional[int] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
     
     @classmethod
-    def from_task_with_relations(cls, task, file_info=None, ai_model=None, issue_count: int = 0):
+    def from_task_with_relations(cls, task, file_info=None, ai_model=None, issue_count: int = 0, processed_issues: int = 0):
         """从Task模型及其关联对象构建响应"""
         return cls(
             id=task.id,
@@ -47,7 +49,8 @@ class TaskResponse(BaseModel):
             status=task.status,
             progress=task.progress,
             issue_count=issue_count,
-            model_label=ai_model.label if ai_model else 'Unknown',
+            processed_issues=processed_issues,
+            ai_model_label=ai_model.label if ai_model else 'Unknown',
             document_chars=file_info.document_chars if file_info else None,
             processing_time=task.processing_time,
             created_at=task.created_at,
@@ -55,7 +58,7 @@ class TaskResponse(BaseModel):
             error_message=task.error_message,
             user_id=task.user_id,
             file_id=task.file_id,
-            model_id=task.model_id
+            ai_model_id=task.model_id
         )
         
 
@@ -64,8 +67,7 @@ class TaskDetail(BaseModel):
     task: TaskResponse
     issues: List['IssueResponse']
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 
 from app.dto.issue import IssueResponse

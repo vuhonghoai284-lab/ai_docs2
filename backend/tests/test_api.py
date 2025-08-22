@@ -26,7 +26,7 @@ def test_create_task(client: TestClient, sample_file, auth_headers):
     """测试创建任务"""
     filename, content, content_type = sample_file
     files = {"file": (filename, content, content_type)}
-    data = {"title": "Test Task", "model_index": 0}
+    data = {"title": "Test Task", "ai_model_index": 0}
     
     response = client.post("/api/tasks", files=files, data=data, headers=auth_headers)
     assert response.status_code == 200
@@ -72,6 +72,31 @@ def test_submit_feedback(client: TestClient, auth_headers):
     # 使用一个不存在的ID会返回404
     response = client.put("/api/issues/999/feedback", json=feedback_data, headers=auth_headers)
     assert response.status_code == 404
+
+
+def test_submit_satisfaction_rating(client: TestClient, auth_headers):
+    """测试提交满意度评分"""
+    # 测试有效的评分
+    rating_data = {
+        "satisfaction_rating": 4.5
+    }
+    # 使用一个不存在的ID会返回404
+    response = client.put("/api/issues/999/satisfaction", json=rating_data, headers=auth_headers)
+    assert response.status_code == 404
+    
+    # 测试无效评分（超出范围）
+    invalid_rating_data = {
+        "satisfaction_rating": 6.0
+    }
+    response = client.put("/api/issues/999/satisfaction", json=invalid_rating_data, headers=auth_headers)
+    assert response.status_code == 422  # 验证错误
+    
+    # 测试无效评分（小于1）
+    invalid_rating_data = {
+        "satisfaction_rating": 0.5
+    }
+    response = client.put("/api/issues/999/satisfaction", json=invalid_rating_data, headers=auth_headers)
+    assert response.status_code == 422  # 验证错误
 
 
 def test_get_ai_outputs(client: TestClient, sample_file, auth_headers):

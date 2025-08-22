@@ -71,12 +71,12 @@ class AIServiceFactory:
                 'issue_detector': None
             }
     
-    def get_service_for_model(self, model_index: int, settings, db_session: Optional[Session] = None):
+    def get_service_for_model(self, ai_model_index: int, settings, db_session: Optional[Session] = None):
         """
         根据模型索引获取AI服务
         
         Args:
-            model_index: 模型索引
+            ai_model_index: 模型索引
             settings: 配置对象
             db_session: 数据库会话
             
@@ -84,12 +84,12 @@ class AIServiceFactory:
             AI服务实例字典
         """
         models = settings.ai_models
-        if model_index < 0 or model_index >= len(models):
-            self.logger.warning(f"⚠️ 无效的模型索引 {model_index}，使用默认模型 {settings.default_model_index}")
-            model_index = settings.default_model_index
+        if ai_model_index < 0 or ai_model_index >= len(models):
+            self.logger.warning(f"⚠️ 无效的模型索引 {ai_model_index}，使用默认模型 {settings.default_model_index}")
+            ai_model_index = settings.default_model_index
             
-        model_config = models[model_index]
-        self.logger.info(f"🎯 选择模型: {model_config.get('label', 'Unknown')} (索引: {model_index})")
+        model_config = models[ai_model_index]
+        self.logger.info(f"🎯 选择模型: {model_config.get('label', 'Unknown')} (索引: {ai_model_index})")
         
         return self.create_service(model_config, settings.is_test_mode, db_session)
     

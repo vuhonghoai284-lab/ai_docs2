@@ -15,7 +15,7 @@ class TestTaskCRUDAPI:
         """测试创建任务成功 - TASK-001"""
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        data = {"title": "测试任务", "model_index": "0"}
+        data = {"title": "测试任务", "ai_ai_model_index": "0"}
         
         response = client.post("/api/tasks", files=files, data=data, headers=auth_headers)
         assert response.status_code == 200
@@ -26,7 +26,7 @@ class TestTaskCRUDAPI:
         assert task["file_name"] == filename
         assert task["status"] == "pending"
         assert "created_at" in task
-        assert "model_label" in task
+        assert "ai_model_label" in task
         
         return task["id"]
     
@@ -43,7 +43,7 @@ class TestTaskCRUDAPI:
         filename, content, content_type = invalid_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
         
-        response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         assert response.status_code == 400
         
         error = response.json()
@@ -56,7 +56,7 @@ class TestTaskCRUDAPI:
         large_content = b"x" * (11 * 1024 * 1024)  # 11MB
         files = {"file": ("large.md", io.BytesIO(large_content), "text/markdown")}
         
-        response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         assert response.status_code == 400
         
         error = response.json()
@@ -67,7 +67,7 @@ class TestTaskCRUDAPI:
         """测试空文件上传 - TASK-010"""
         files = {"file": ("empty.md", io.BytesIO(b""), "text/markdown")}
         
-        response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         # 根据业务逻辑，空文件可能被接受或拒绝
         assert response.status_code in [200, 400]
     
@@ -204,7 +204,7 @@ class TestTaskFileHandling:
         
         for filename, content, content_type in supported_files:
             files = {"file": (filename, io.BytesIO(content), content_type)}
-            response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+            response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
             assert response.status_code == 200, f"Failed for file type: {filename}"
             
             task = response.json()
@@ -242,7 +242,7 @@ class TestTaskFileHandling:
             content = f"# {filename}\nTest content".encode('utf-8')
             files = {"file": (filename, io.BytesIO(content), "text/markdown")}
             
-            response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+            response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
             assert response.status_code == 200, f"Failed for filename: {filename}"
             
             task = response.json()
@@ -259,14 +259,14 @@ class TestTaskPermissions:
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
         
-        response = client.post("/api/tasks", files=files, data={"title": "普通用户任务", "model_index": "0"}, headers=normal_headers)
+        response = client.post("/api/tasks", files=files, data={"title": "普通用户任务", "ai_model_index": "0"}, headers=normal_headers)
         assert response.status_code == 200
         user_task_id = response.json()["id"]
         
         # 管理员创建任务
         admin_headers = {"Authorization": f"Bearer {admin_user_token['token']}"}
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        response = client.post("/api/tasks", files=files, data={"title": "管理员任务", "model_index": "0"}, headers=admin_headers)
+        response = client.post("/api/tasks", files=files, data={"title": "管理员任务", "ai_model_index": "0"}, headers=admin_headers)
         assert response.status_code == 200
         admin_task_id = response.json()["id"]
         
@@ -300,7 +300,7 @@ class TestTaskPerformance:
         files = {"file": (filename, io.BytesIO(content), content_type)}
         
         start_time = time.time()
-        response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         end_time = time.time()
         
         assert response.status_code == 200

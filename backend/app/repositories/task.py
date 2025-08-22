@@ -80,6 +80,13 @@ class TaskRepository(ITaskRepository):
         """统计任务的问题数量"""
         return self.db.query(Issue).filter(Issue.task_id == task_id).count()
     
+    def count_processed_issues(self, task_id: int) -> int:
+        """统计任务的已处理问题数量"""
+        return self.db.query(Issue).filter(
+            Issue.task_id == task_id,
+            Issue.feedback_type.isnot(None)
+        ).count()
+    
     def update_status(self, task_id: int, status: str, progress: int = None) -> Task:
         """更新任务状态和进度"""
         update_data = {"status": status}

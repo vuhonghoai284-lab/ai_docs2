@@ -32,14 +32,14 @@ class TestCompleteDocumentTestingWorkflow:
         assert models_response.status_code == 200
         models_data = models_response.json()
         assert len(models_data["models"]) > 0
-        default_model_index = models_data["default_index"]
+        default_ai_model_index = models_data["default_index"]
         
         # 3. 创建文档测试任务
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
         task_data = {
             "title": "E2E测试任务",
-            "model_index": str(default_model_index)
+            "ai_model_index": str(default_ai_model_index)
         }
         
         task_response = client.post("/api/tasks", files=files, data=task_data, headers=headers)
@@ -124,7 +124,7 @@ class TestThirdPartyUserWorkflow:
         files = {"file": (filename, io.BytesIO(content), content_type)}
         task_data = {
             "title": "第三方用户测试任务",
-            "model_index": "0"
+            "ai_model_index": "0"
         }
         
         task_response = client.post("/api/tasks", files=files, data=task_data, headers=headers)
@@ -229,7 +229,7 @@ class TestConcurrentTaskProcessing:
             
             task_data = {
                 "title": f"并发任务 #{task_index}",
-                "model_index": "0"
+                "ai_model_index": "0"
             }
             
             try:

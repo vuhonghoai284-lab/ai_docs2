@@ -83,9 +83,16 @@ cors:
     - "http://localhost:3001"
     - "http://localhost:3002"
     - "http://localhost:3003"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:3000"
+    - "http://127.0.0.1:5173"
+    # 动态配置：支持自定义前端地址
+    - "${FRONTEND_URL}"  # 从环境变量获取前端地址
   allow_credentials: true
   allow_methods: ["*"]
   allow_headers: ["*"]
+  # 开发模式：允许更宽松的CORS策略
+  development_mode: "${CORS_DEVELOPMENT_MODE:false}"  # 默认false，可通过环境变量启用
 
 # 测试模式配置
 test_mode: false  # 全局测试模式开关
@@ -112,7 +119,11 @@ third_party_auth:
   # OAuth2配置
   client_id: "${THIRD_PARTY_CLIENT_ID}"  # 从环境变量获取
   client_secret: "${THIRD_PARTY_CLIENT_SECRET}"  # 从环境变量获取
-  redirect_url: "${THIRD_PARTY_REDIRECT_URL}"  # 从环境变量获取
+  
+  # 动态重定向URL配置 - 支持前端域名/IP端口配置
+  frontend_domain: "${FRONTEND_DOMAIN}"  # 前端域名，如: http://localhost:5173 或 https://your-domain.com
+  redirect_path: "/callback"  # 回调路径，固定为/callback
+  
   scope: "base.profile"
   
   # API端点配置
@@ -129,7 +140,8 @@ third_party_auth:
   # 实际配置应该通过环境变量设置：
   # THIRD_PARTY_CLIENT_ID=your_client_id
   # THIRD_PARTY_CLIENT_SECRET=your_client_secret  
-  # THIRD_PARTY_REDIRECT_URL=https://your-domain.com/callback
+  # FRONTEND_DOMAIN=http://localhost:5173  # 开发环境
+  # FRONTEND_DOMAIN=https://your-production-domain.com  # 生产环境
   # THIRD_PARTY_AUTH_URL=https://auth-provider.com/oauth2/authorize
   # THIRD_PARTY_TOKEN_URL=https://auth-provider.com/oauth2/accesstoken
   # THIRD_PARTY_USERINFO_URL=https://auth-provider.com/oauth2/userinfo

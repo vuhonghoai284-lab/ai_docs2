@@ -20,7 +20,8 @@
       "Bash(python:*)",
       "Bash(rm:*)",
       "Bash(PYTHONPATH=. python app/main.py)",
-      "Bash(PYTHONPATH=. CONFIG_FILE=config.test.yaml python app/main.py)"
+      "Bash(PYTHONPATH=. CONFIG_FILE=config.test.yaml python app/main.py)",
+      "Bash(pkill -f \"python.*main.py\")"
     ],
     "defaultMode": "acceptEdits"
   }

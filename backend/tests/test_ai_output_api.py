@@ -15,7 +15,7 @@ class TestAIOutputAPI:
         # 先创建任务
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        create_response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        create_response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         task_id = create_response.json()["id"]
         
         # 获取AI输出
@@ -31,7 +31,7 @@ class TestAIOutputAPI:
         # 先创建任务
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        create_response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        create_response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         task_id = create_response.json()["id"]
         
         # 使用操作类型过滤
@@ -66,7 +66,7 @@ class TestAIOutputAPI:
         # 管理员创建任务
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        create_response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        create_response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         task_id = create_response.json()["id"]
         
         # 普通用户尝试访问
@@ -96,7 +96,7 @@ class TestAIOutputDataValidation:
         # 创建任务
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        create_response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        create_response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         task_id = create_response.json()["id"]
         
         response = client.get(f"/api/tasks/{task_id}/ai-outputs", headers=auth_headers)
@@ -118,7 +118,7 @@ class TestAIOutputDataValidation:
         # 创建任务
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        create_response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        create_response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         task_id = create_response.json()["id"]
         
         # 测试各种过滤参数
@@ -146,7 +146,7 @@ class TestAIOutputPerformance:
         # 创建任务
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        create_response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        create_response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         task_id = create_response.json()["id"]
         
         start_time = time.time()
@@ -162,7 +162,7 @@ class TestAIOutputPerformance:
         # 创建任务
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        create_response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        create_response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         task_id = create_response.json()["id"]
         
         # 获取AI输出（可能包含大量数据）
@@ -210,7 +210,7 @@ class TestIssueAPI:
         # 先创建任务以便有可用的issue
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        create_response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        create_response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         assert create_response.status_code == 200
         task_id = create_response.json()["id"]
         
@@ -223,22 +223,21 @@ class TestIssueAPI:
         if task_detail.get("issues") and len(task_detail["issues"]) > 0:
             issue_id = task_detail["issues"][0]["id"]
             
-            # 测试缺少必要字段
+            # 测试空数据（由于所有字段都是可选的，这应该返回200而不是422）
             response = client.put(f"/api/issues/{issue_id}/feedback", json={}, headers=auth_headers)
-            assert response.status_code == 422  # Validation Error
+            assert response.status_code == 200  # 所有字段可选，所以返回200
             
-            # 测试无效的反馈类型
+            # 测试无效的反馈类型（有Literal限制，应该返回422）
             invalid_feedback = {
                 "feedback_type": "invalid_type",
                 "comment": "测试评论"
             }
             response = client.put(f"/api/issues/{issue_id}/feedback", json=invalid_feedback, headers=auth_headers)
-            # 根据具体验证规则，可能返回422或其他错误
-            assert response.status_code in [422, 400]
+            assert response.status_code == 422  # Literal验证失败
         else:
-            # 如果没有issues，则测试不存在的issue ID应该返回422（空数据验证失败）或404
+            # 如果没有issues，则测试不存在的issue ID应该返回404
             response = client.put("/api/issues/99999/feedback", json={}, headers=auth_headers)
-            assert response.status_code in [422, 404]
+            assert response.status_code == 404
 
 
 class TestTaskLogAPI:
@@ -249,7 +248,7 @@ class TestTaskLogAPI:
         # 先创建任务
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        create_response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        create_response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         task_id = create_response.json()["id"]
         
         # 获取任务日志
@@ -279,7 +278,7 @@ class TestTaskLogAPI:
         # 管理员创建任务
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        create_response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        create_response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         task_id = create_response.json()["id"]
         
         # 普通用户尝试访问
@@ -291,7 +290,7 @@ class TestTaskLogAPI:
         # 创建任务
         filename, content, content_type = sample_file
         files = {"file": (filename, io.BytesIO(content), content_type)}
-        create_response = client.post("/api/tasks", files=files, data={"model_index": "0"}, headers=auth_headers)
+        create_response = client.post("/api/tasks", files=files, data={"ai_model_index": "0"}, headers=auth_headers)
         task_id = create_response.json()["id"]
         
         response = client.get(f"/api/tasks/{task_id}/logs/history", headers=auth_headers)

@@ -1,0 +1,109 @@
+# 自定义端口部署配置示例
+# 当需要修改后端端口时，使用此配置文件
+
+# 服务器配置
+server:
+  host: "0.0.0.0"  # 监听地址
+  port: 8081  # 自定义端口
+  debug: true  # 启用调试模式（开发环境）
+  reload: false  # 自动重载
+  workers: 1  # 工作进程数
+
+# 数据库
+database: ./data/app.db
+
+# AI模型配置 - 支持多模型
+ai_models:
+  # 默认使用的模型索引（从0开始）
+  default_index: 0
+  
+  # 模型列表
+  models:
+    - label: "GPT-4o Mini (快速)"
+      provider: "openai"
+      config:
+        api_key: "${OPENAI_API_KEY}"
+        base_url: "https://api.openai.com/v1"
+        model: "gpt-4o-mini"
+        temperature: 0.3
+        max_tokens: 8000
+        context_window: 128000
+        reserved_tokens: 2000
+        timeout: 60
+        max_retries: 3
+      description: "OpenAI GPT-4o Mini模型，快速响应"
+
+# 文件设置
+file_settings:
+  max_file_size: 10485760  # 10MB
+  allowed_extensions:
+    - pdf
+    - docx
+    - md
+    - txt
+
+# 目录配置
+directories:
+  upload_dir: ./data/uploads
+  report_dir: ./data/reports
+  log_dir: ./data/logs
+  temp_dir: ./data/temp
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./data/logs/app.log"
+  max_size: 10485760
+  backup_count: 5
+
+# 任务处理配置
+task_processing:
+  max_concurrent_tasks: 3  # 最大并发任务数
+  task_timeout: 12000  # 任务超时时间（秒）
+  retry_failed_tasks: true  # 是否重试失败的任务
+  
+# CORS配置 - 自定义端口部署时的推荐配置
+cors:
+  enabled: true
+  origins:
+    # 标准localhost地址
+    - "http://localhost:3000"
+    - "http://localhost:3001"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:3000"
+    - "http://127.0.0.1:5173"
+    # 支持环境变量配置前端地址
+    - "${FRONTEND_URL}"  # 例如: http://192.168.1.100:3000
+  allow_credentials: true
+  allow_methods: ["*"]
+  allow_headers: ["*"]
+  # 开发模式：启用宽松的CORS策略
+  development_mode: true  # 自动允许常用的开发地址
+
+# 测试模式配置
+test_mode: false  # 全局测试模式开关
+
+# 第三方登录配置
+third_party_auth:
+  # OAuth2配置
+  client_id: "${THIRD_PARTY_CLIENT_ID}"
+  client_secret: "${THIRD_PARTY_CLIENT_SECRET}"
+  redirect_url: "${THIRD_PARTY_REDIRECT_URL}"  # 重要：需要与新端口匹配
+  scope: "base.profile"
+  
+  # API端点配置
+  api_endpoints:
+    authorization_url: "${THIRD_PARTY_AUTH_URL}"
+    token_url: "${THIRD_PARTY_TOKEN_URL}"
+    userinfo_url: "${THIRD_PARTY_USERINFO_URL}"
+  
+  # 超时和重试配置
+  request_timeout: 30
+  max_retries: 3
+
+# JWT配置
+jwt:
+  secret_key: "${JWT_SECRET_KEY}"
+  algorithm: "HS256"
+  access_token_expire_minutes: 30

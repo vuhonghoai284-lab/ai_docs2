@@ -14,7 +14,7 @@ class ITaskService(BaseService[TaskResponse, int]):
     
     @abstractmethod
     async def create_task(self, file: UploadFile, title: Optional[str] = None, 
-                         model_index: Optional[int] = None, user_id: Optional[int] = None) -> TaskResponse:
+                         ai_model_index: Optional[int] = None, user_id: Optional[int] = None) -> TaskResponse:
         """创建任务"""
         pass
     

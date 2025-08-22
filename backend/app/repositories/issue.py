@@ -36,12 +36,26 @@ class IssueRepository:
         """获取任务的所有问题"""
         return self.db.query(Issue).filter(Issue.task_id == task_id).all()
     
-    def update_feedback(self, issue_id: int, feedback_type: str, comment: Optional[str] = None) -> Optional[Issue]:
+    def update_feedback(self, issue_id: int, feedback_type: Optional[str], comment: Optional[str] = None) -> Optional[Issue]:
         """更新问题反馈"""
         issue = self.get_by_id(issue_id)
         if issue:
-            issue.feedback_type = feedback_type
-            issue.feedback_comment = comment
+            # 如果feedback_type为空字符串或None，清除反馈
+            if feedback_type == "" or feedback_type is None:
+                issue.feedback_type = None
+                issue.feedback_comment = None
+            else:
+                issue.feedback_type = feedback_type
+                issue.feedback_comment = comment
+            self.db.commit()
+            self.db.refresh(issue)
+        return issue
+    
+    def update_satisfaction_rating(self, issue_id: int, rating: float) -> Optional[Issue]:
+        """更新满意度评分"""
+        issue = self.get_by_id(issue_id)
+        if issue:
+            issue.satisfaction_rating = rating
             self.db.commit()
             self.db.refresh(issue)
         return issue

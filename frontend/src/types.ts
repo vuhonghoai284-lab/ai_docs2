@@ -8,12 +8,16 @@ export interface Task {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
   issue_count?: number;  // 新增：问题数量
-  model_label?: string;   // 新增：模型名称
+  processed_issues?: number; // 新增：已处理问题数量
+  ai_model_label?: string;   // 新增：模型名称
   document_chars?: number; // 新增：文档字符数
   processing_time?: number; // 新增：处理耗时(秒)
   created_at: string;
   completed_at?: string;
   error_message?: string;
+  created_by?: string; // 新增：创建人ID
+  created_by_name?: string; // 新增：创建人名称
+  created_by_type?: string; // 新增：创建人类型
 }
 
 export interface Issue {
@@ -63,4 +67,93 @@ export interface User {
   is_system_admin: boolean;
   created_at: string;
   last_login_at?: string;
+}
+
+// 运营数据统计相关类型
+export interface TrendData {
+  date: string;
+  count: number;
+}
+
+export interface DistributionData {
+  [key: string]: any;
+  count: number;
+}
+
+export interface UserStats {
+  total_users: number;
+  new_users_today: number;
+  new_users_this_week: number;
+  new_users_this_month: number;
+  active_users_today: number;
+  active_users_this_week: number;
+  active_users_this_month: number;
+  admin_users_count: number;
+  system_admin_users_count: number;
+  user_registration_trend: TrendData[];
+  user_activity_trend: TrendData[];
+}
+
+export interface TaskStats {
+  total_tasks: number;
+  pending_tasks: number;
+  processing_tasks: number;
+  completed_tasks: number;
+  failed_tasks: number;
+  tasks_today: number;
+  tasks_this_week: number;
+  tasks_this_month: number;
+  avg_processing_time?: number;
+  success_rate: number;
+  task_creation_trend: TrendData[];
+  task_completion_trend: TrendData[];
+  task_status_distribution: DistributionData[];
+}
+
+export interface SystemStats {
+  total_files: number;
+  total_file_size: number;
+  files_today: number;
+  files_this_week: number;
+  files_this_month: number;
+  total_ai_calls: number;
+  ai_calls_today: number;
+  ai_calls_this_week: number;
+  ai_calls_this_month: number;
+  avg_ai_processing_time?: number;
+  file_type_distribution: DistributionData[];
+  ai_model_usage: DistributionData[];
+}
+
+export interface IssueStats {
+  total_issues: number;
+  issues_by_severity: DistributionData[];
+  issues_by_type: DistributionData[];
+  feedback_stats: { [key: string]: number };
+  recent_issues: any[];
+  issue_trend: TrendData[];
+  satisfaction_stats: {
+    average_rating: number;
+    rating_distribution: { rating: number; count: number }[];
+    total_ratings: number;
+    high_satisfaction_rate: number;
+    low_satisfaction_rate: number;
+  };
+}
+
+export interface ErrorStats {
+  total_errors: number;
+  errors_today: number;
+  errors_this_week: number;
+  error_types: DistributionData[];
+  recent_errors: any[];
+}
+
+export interface AnalyticsData {
+  user_stats: UserStats;
+  task_stats: TaskStats;
+  system_stats: SystemStats;
+  issue_stats: IssueStats;
+  error_stats: ErrorStats;
+  last_updated: string;
 }

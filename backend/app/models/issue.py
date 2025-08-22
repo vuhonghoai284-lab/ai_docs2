@@ -25,6 +25,7 @@ class Issue(Base):
     context = Column(Text)
     feedback_type = Column(String(50))  # accept, reject
     feedback_comment = Column(Text)
+    satisfaction_rating = Column(Float)  # 满意度评分 1-5星
     created_at = Column(String(50))
     updated_at = Column(String(50))
     

@@ -1,6 +1,6 @@
 // API服务封装
 import axios from 'axios';
-import { Task, TaskDetail, AIOutput } from './types';
+import { Task, TaskDetail, AIOutput, AnalyticsData, UserStats, TaskStats, SystemStats, IssueStats, ErrorStats } from './types';
 import config from './config';
 
 const API_BASE = config.apiBaseUrl;
@@ -115,6 +115,53 @@ export const taskAPI = {
   // 重试任务
   retryTask: async (taskId: number) => {
     const response = await api.post(`/tasks/${taskId}/retry`);
+    return response.data;
+  },
+
+  // 提交满意度评分
+  submitSatisfactionRating: async (issueId: number, rating: number) => {
+    const response = await api.put(`/issues/${issueId}/satisfaction`, {
+      satisfaction_rating: rating,
+    });
+    return response.data;
+  },
+};
+
+// 运营数据统计API
+export const analyticsAPI = {
+  // 获取综合运营数据概览
+  getOverview: async (days: number = 30): Promise<AnalyticsData> => {
+    const response = await api.get<AnalyticsData>(`/analytics/overview?days=${days}`);
+    return response.data;
+  },
+
+  // 获取用户统计数据
+  getUserStats: async (days: number = 30): Promise<UserStats> => {
+    const response = await api.get<UserStats>(`/analytics/users?days=${days}`);
+    return response.data;
+  },
+
+  // 获取任务统计数据
+  getTaskStats: async (days: number = 30): Promise<TaskStats> => {
+    const response = await api.get<TaskStats>(`/analytics/tasks?days=${days}`);
+    return response.data;
+  },
+
+  // 获取系统资源统计数据
+  getSystemStats: async (days: number = 30): Promise<SystemStats> => {
+    const response = await api.get<SystemStats>(`/analytics/system?days=${days}`);
+    return response.data;
+  },
+
+  // 获取问题统计数据
+  getIssueStats: async (days: number = 30): Promise<IssueStats> => {
+    const response = await api.get<IssueStats>(`/analytics/issues?days=${days}`);
+    return response.data;
+  },
+
+  // 获取错误统计数据
+  getErrorStats: async (days: number = 30): Promise<ErrorStats> => {
+    const response = await api.get<ErrorStats>(`/analytics/errors?days=${days}`);
     return response.data;
   },
 };

@@ -1,7 +1,7 @@
 """
 问题相关的DTO
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Literal
 
 
@@ -20,12 +20,17 @@ class IssueResponse(BaseModel):
     context: Optional[str] = None
     feedback_type: Optional[str] = None
     feedback_comment: Optional[str] = None
+    satisfaction_rating: Optional[float] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FeedbackRequest(BaseModel):
     """反馈请求"""
-    feedback_type: Literal["accept", "reject"] = Field(..., description="反馈类型，只能是 accept 或 reject")
+    feedback_type: Optional[Literal["accept", "reject", ""]] = Field(None, description="反馈类型，可以是 accept、reject 或空字符串（用于清除反馈）")
     comment: Optional[str] = None
+
+
+class SatisfactionRatingRequest(BaseModel):
+    """满意度评分请求"""
+    satisfaction_rating: float = Field(..., ge=1.0, le=5.0, description="满意度评分，范围1-5星")

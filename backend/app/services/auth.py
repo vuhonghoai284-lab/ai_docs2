@@ -151,7 +151,7 @@ class AuthService(IAuthService):
         payload = {
             "client_id": self.third_party_config.get("client_id"),
             "client_secret": self.third_party_config.get("client_secret"),
-            "redirect_url": self.third_party_config.get("redirect_url"),
+            "redirect_url": self._get_redirect_url(),
             "grant_type": "authorization_code",
             "code": code
         }
@@ -295,7 +295,7 @@ class AuthService(IAuthService):
         api_endpoints = self.third_party_config.get("api_endpoints", {})
         auth_url = api_endpoints.get("authorization_url")
         client_id = self.third_party_config.get("client_id")
-        redirect_url = self.third_party_config.get("redirect_url")
+        redirect_url = self._get_redirect_url()
         scope = self.third_party_config.get("scope", "base.profile")
         
         # 验证必需的配置
@@ -309,6 +309,26 @@ class AuthService(IAuthService):
             f"scope={scope}&display=page&"
             f"state={state}"
         )
+    
+    def _get_redirect_url(self) -> str:
+        """获取重定向URL - 支持动态域名配置"""
+        # 获取前端域名和回调路径
+        frontend_domain = self.third_party_config.get("frontend_domain")
+        redirect_path = self.third_party_config.get("redirect_path", "/callback")
+        
+        # 验证配置
+        if not frontend_domain:
+            raise ValueError("第三方登录配置缺失: frontend_domain 未配置")
+        
+        # 确保域名不以斜杠结尾
+        if frontend_domain.endswith('/'):
+            frontend_domain = frontend_domain[:-1]
+        
+        # 确保路径以斜杠开头
+        if not redirect_path.startswith('/'):
+            redirect_path = '/' + redirect_path
+            
+        return f"{frontend_domain}{redirect_path}"
     
     def _mock_token_response(self, code: str) -> ThirdPartyTokenResponse:
         """模拟第三方令牌交换（用于测试）"""

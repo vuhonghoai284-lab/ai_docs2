@@ -2,21 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { 
   Card, Button, Tag, Progress, Space, message, Spin, Empty, 
   Input, Radio, Tabs, Typography, Pagination, Collapse, Badge,
-  Divider, Row, Col, Tooltip, Alert, Dropdown
+  Divider, Row, Col, Tooltip, Alert, Dropdown, Rate
 } from 'antd';
 import { 
   ArrowLeftOutlined, DownloadOutlined, CheckOutlined, CloseOutlined, 
   FileTextOutlined, ExclamationCircleOutlined, BulbOutlined,
   ThunderboltOutlined, UserOutlined, QuestionCircleOutlined,
   HistoryOutlined, RobotOutlined, InfoCircleOutlined, SwapOutlined,
-  EnvironmentOutlined, EditOutlined, DownOutlined
+  EnvironmentOutlined, EditOutlined, DownOutlined, StarOutlined,
+  WarningOutlined, FireOutlined, InfoOutlined
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { taskAPI } from '../api';
 import { TaskDetail as TaskDetailType, Issue, AIOutput } from '../types';
 import TaskLogs from '../components/TaskLogs';
 import './TaskDetailEnhanced.css';
-import './TaskDetailCompact.css';
 
 const { Text, Paragraph, Title } = Typography;
 const { Panel } = Collapse;
@@ -28,6 +28,7 @@ interface EnhancedIssue extends Issue {
   user_impact?: string;
   reasoning?: string;
   context?: string;
+  satisfaction_rating?: number;  // 满意度评分 1-5星
 }
 
 interface EnhancedTaskDetail extends TaskDetailType {
@@ -51,6 +52,8 @@ const TaskDetailEnhanced: React.FC = () => {
   const [expandedComments, setExpandedComments] = useState<Set<number>>(new Set());
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [aiOutputFilter, setAiOutputFilter] = useState<string>('all');
+  const [aiStatusFilter, setAiStatusFilter] = useState<string>('all');
 
   const loadTaskDetail = async () => {
     if (!id) return;
@@ -105,31 +108,25 @@ const TaskDetailEnhanced: React.FC = () => {
   };
 
   const handleQuickFeedback = async (issueId: number, feedbackType: 'accept' | 'reject' | null, comment?: string) => {
-    if (feedbackType === null) {
-      // 重新处理：清除之前的反馈
-      setFeedbackLoading({ ...feedbackLoading, [issueId]: true });
-      try {
-        // 这里需要后端支持清除反馈的API，暂时重新加载
-        loadTaskDetail();
-        message.info('已重置，可重新处理');
-      } catch (error) {
-        message.error('操作失败');
-      }
-      setFeedbackLoading({ ...feedbackLoading, [issueId]: false });
-      return;
-    }
-
     setFeedbackLoading({ ...feedbackLoading, [issueId]: true });
+    
     try {
-      await taskAPI.submitFeedback(issueId, feedbackType, comment);
-      message.success(
-        feedbackType === 'accept' ? '已接受此问题' : '已拒绝此问题',
-        1.5
-      );
+      if (feedbackType === null) {
+        // 重新处理：清除之前的反馈，通过提交空的反馈类型来实现
+        await taskAPI.submitFeedback(issueId, '', comment);
+        message.success('已重置，可重新处理');
+      } else {
+        await taskAPI.submitFeedback(issueId, feedbackType, comment);
+        message.success(
+          feedbackType === 'accept' ? '已接受此问题' : '已拒绝此问题',
+          1.5
+        );
+      }
       loadTaskDetail();
     } catch (error) {
-      message.error('提交反馈失败');
+      message.error('操作失败');
     }
+    
     setFeedbackLoading({ ...feedbackLoading, [issueId]: false });
   };
 
@@ -155,14 +152,65 @@ const TaskDetailEnhanced: React.FC = () => {
     return <Tag color={config.color}>{config.text}</Tag>;
   };
 
-  const getSeverityBadge = (severity: string) => {
-    const severityMap: { [key: string]: { color: string; icon: React.ReactNode; tagColor: string } } = {
-      '致命': { color: 'red', icon: <ExclamationCircleOutlined />, tagColor: 'error' },
-      '严重': { color: 'orange', icon: <ExclamationCircleOutlined />, tagColor: 'warning' },
-      '一般': { color: 'blue', icon: <QuestionCircleOutlined />, tagColor: 'processing' },
-      '提示': { color: 'green', icon: <BulbOutlined />, tagColor: 'success' }
+  const getSeverityBadge = (severity: string, prominent: boolean = false) => {
+    const severityMap: { [key: string]: { 
+      color: string; 
+      icon: React.ReactNode; 
+      tagColor: string;
+      bgColor: string;
+      textColor: string;
+    } } = {
+      '致命': { 
+        color: 'red', 
+        icon: <FireOutlined />, 
+        tagColor: 'error',
+        bgColor: '#ffebee',
+        textColor: '#c62828'
+      },
+      '严重': { 
+        color: 'orange', 
+        icon: <WarningOutlined />, 
+        tagColor: 'warning',
+        bgColor: '#fff8e1',
+        textColor: '#e65100'
+      },
+      '一般': { 
+        color: 'blue', 
+        icon: <InfoOutlined />, 
+        tagColor: 'processing',
+        bgColor: '#e3f2fd',
+        textColor: '#1565c0'
+      },
+      '提示': { 
+        color: 'green', 
+        icon: <BulbOutlined />, 
+        tagColor: 'success',
+        bgColor: '#e8f5e8',
+        textColor: '#2e7d32'
+      }
     };
     const config = severityMap[severity] || severityMap['一般'];
+    
+    if (prominent) {
+      return (
+        <div className={`severity-badge severity-${severity.toLowerCase()}`} style={{
+          background: config.bgColor,
+          color: config.textColor,
+          padding: '6px 12px',
+          borderRadius: '6px',
+          fontWeight: '600',
+          fontSize: '14px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          border: `1px solid ${config.color}20`
+        }}>
+          {config.icon}
+          <span>{severity}级别</span>
+        </div>
+      );
+    }
+    
     return (
       <Tag color={config.tagColor} icon={config.icon}>
         {severity}
@@ -455,121 +503,156 @@ const TaskDetailEnhanced: React.FC = () => {
                       </Row>
                     </Card>
 
-                    {/* 问题列表 - 紧凑设计 */}
+                    {/* 问题列表 - 优化设计 */}
                     <div className="issues-list">
                       {paginatedIssues.map((issue) => (
                         <Card 
                           key={issue.id} 
-                          className={`issue-card-compact issue-severity-${issue.severity.toLowerCase()} ${issue.feedback_type ? 'processed' : 'pending'}`}
+                          className={`issue-card-enhanced issue-severity-${issue.severity.toLowerCase()} ${issue.feedback_type ? 'processed' : 'pending'}`}
                           size="small"
                         >
-                          {/* 紧凑的问题头部 */}
+                          {/* 第一行：问题编号 + 级别 + 错误类型 + 问题描述 + 状态 */}
                           <div className="issue-header-compact">
                             <div className="issue-main-info">
-                              <span className="issue-number">#{startIndex + paginatedIssues.indexOf(issue) + 1}</span>
-                              <span className="issue-type-badge">[{issue.issue_type}]</span>
-                              <Text className="issue-desc" ellipsis={{ tooltip: issue.description }}>
-                                {issue.description}
-                              </Text>
+                              <Space size={12} align="center">
+                                <span className="issue-number">#{startIndex + paginatedIssues.indexOf(issue) + 1}</span>
+                                {getSeverityBadge(issue.severity, false)}
+                                <Tag color="blue" className="issue-type-tag">[{issue.issue_type}]</Tag>
+                                <Text 
+                                  className="issue-description" 
+                                  ellipsis={{ tooltip: issue.description }}
+                                  style={{ fontWeight: '500', color: '#262626', flex: 1 }}
+                                >
+                                  {issue.description}
+                                </Text>
+                              </Space>
                             </div>
-                            <div className="issue-actions-compact">
-                              {getSeverityBadge(issue.severity)}
+                            <div className="issue-status-section">
                               {issue.feedback_type ? (
-                                <Tag icon={issue.feedback_type === 'accept' ? <CheckOutlined /> : <CloseOutlined />} 
-                                     color={issue.feedback_type === 'accept' ? 'success' : 'error'}
-                                     size="small">
+                                <Tag 
+                                  icon={issue.feedback_type === 'accept' ? <CheckOutlined /> : <CloseOutlined />} 
+                                  color={issue.feedback_type === 'accept' ? 'success' : 'error'}
+                                  style={{ fontSize: '12px' }}
+                                >
                                   {issue.feedback_type === 'accept' ? '已接受' : '已拒绝'}
                                 </Tag>
-                              ) : null}
+                              ) : (
+                                <Tag color="default" style={{ fontSize: '12px' }}>
+                                  待处理
+                                </Tag>
+                              )}
                             </div>
                           </div>
 
-                          {/* 原文预览（仅显示关键部分） */}
+                          {/* 第二行：原文内容（单行显示） */}
                           {issue.original_text && (
-                            <div className="issue-preview">
-                              <Text type="secondary" className="preview-label">原文：</Text>
-                              <Text className="preview-text" ellipsis={{ tooltip: issue.original_text }}>
-                                {issue.original_text}
-                              </Text>
-                            </div>
-                          )}
-
-                          {/* 改进建议（紧凑显示） */}
-                          {issue.suggestion && (
-                            <div className="suggestion-preview">
-                              <Text type="secondary" className="preview-label">建议：</Text>
-                              <Text className="suggestion-text" ellipsis={{ tooltip: issue.suggestion }}>
-                                {issue.suggestion}
-                              </Text>
-                            </div>
-                          )}
-
-                          {/* 快速操作区 */}
-                          <div className="quick-actions">
-                            {!issue.feedback_type ? (
-                              <Space size={8}>
-                                <Button
-                                  type="primary"
-                                  size="small"
-                                  icon={<CheckOutlined />}
-                                  loading={feedbackLoading[issue.id]}
-                                  onClick={() => handleQuickFeedback(issue.id, 'accept')}
-                                >
-                                  接受
-                                </Button>
-                                <Button
-                                  danger
-                                  size="small"
-                                  icon={<CloseOutlined />}
-                                  loading={feedbackLoading[issue.id]}
-                                  onClick={() => handleQuickFeedback(issue.id, 'reject')}
-                                >
-                                  拒绝
-                                </Button>
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  icon={<FileTextOutlined />}
-                                  onClick={() => toggleComment(issue.id)}
-                                >
-                                  {issue.feedback_comment ? '编辑评论' : '添加评论'}
-                                </Button>
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  icon={<InfoCircleOutlined />}
-                                  onClick={() => toggleSection(issue.id, 'details')}
-                                >
-                                  详情
-                                </Button>
-                              </Space>
-                            ) : (
-                              <Space size={8}>
-                                <Text type="secondary">
-                                  已{issue.feedback_type === 'accept' ? '接受' : '拒绝'}
+                            <div className="issue-content-row">
+                              <div className="content-section original">
+                                <Text style={{ fontSize: 13, lineHeight: 1.5, color: '#595959' }}>
+                                  <FileTextOutlined style={{ color: '#ff7875', marginRight: 6 }} />
+                                  <Text strong style={{ color: '#ff7875', marginRight: 8 }}>原文内容：</Text>
+                                  {issue.original_text}
                                 </Text>
-                                <Button
-                                  type="link"
-                                  size="small"
-                                  onClick={() => handleQuickFeedback(issue.id, null)}
-                                >
-                                  重新处理
-                                </Button>
-                                {issue.feedback_comment && (
-                                  <Tooltip title={issue.feedback_comment}>
-                                    <Tag icon={<FileTextOutlined />} color="blue" size="small">有评论</Tag>
-                                  </Tooltip>
-                                )}
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  icon={<InfoCircleOutlined />}
-                                  onClick={() => toggleSection(issue.id, 'details')}
-                                >
-                                  详情
-                                </Button>
-                              </Space>
-                            )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 第三行：改进建议（单行显示） */}
+                          {issue.suggestion && (
+                            <div className="issue-content-row">
+                              <div className="content-section suggestion">
+                                <Text style={{ fontSize: 13, lineHeight: 1.5, color: '#595959' }}>
+                                  <EditOutlined style={{ color: '#73d13d', marginRight: 6 }} />
+                                  <Text strong style={{ color: '#73d13d', marginRight: 8 }}>改进建议：</Text>
+                                  {issue.suggestion}
+                                </Text>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 操作行：快速操作 + 满意度评分（右侧） */}
+                          <div className="issue-actions-row">
+                            <div className="actions-left">
+                              {!issue.feedback_type ? (
+                                <Space size={8}>
+                                  <Button
+                                    type="primary"
+                                    size="small"
+                                    icon={<CheckOutlined />}
+                                    loading={feedbackLoading[issue.id]}
+                                    onClick={() => handleQuickFeedback(issue.id, 'accept')}
+                                  >
+                                    接受
+                                  </Button>
+                                  <Button
+                                    danger
+                                    size="small"
+                                    icon={<CloseOutlined />}
+                                    loading={feedbackLoading[issue.id]}
+                                    onClick={() => handleQuickFeedback(issue.id, 'reject')}
+                                  >
+                                    拒绝
+                                  </Button>
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<FileTextOutlined />}
+                                    onClick={() => toggleComment(issue.id)}
+                                  >
+                                    {issue.feedback_comment ? '编辑评论' : '添加评论'}
+                                  </Button>
+                                </Space>
+                              ) : (
+                                <Space size={8}>
+                                  <Text type="secondary" style={{ fontSize: 13 }}>
+                                    已{issue.feedback_type === 'accept' ? '接受' : '拒绝'}
+                                  </Text>
+                                  <Button
+                                    type="link"
+                                    size="small"
+                                    onClick={() => handleQuickFeedback(issue.id, null)}
+                                  >
+                                    重新处理
+                                  </Button>
+                                  {issue.feedback_comment && (
+                                    <Tooltip title={issue.feedback_comment}>
+                                      <Tag icon={<FileTextOutlined />} color="blue" style={{ fontSize: 11 }}>有评论</Tag>
+                                    </Tooltip>
+                                  )}
+                                </Space>
+                              )}
+                            </div>
+                            <div className="actions-right">
+                              <div className="satisfaction-rating-compact">
+                                <Space size={8} align="center">
+                                  <Text style={{ fontSize: 12, color: '#8c8c8c' }}>满意度：</Text>
+                                  <Rate
+                                    allowHalf
+                                    value={issue.satisfaction_rating || 0}
+                                    onChange={async (value) => {
+                                      try {
+                                        const newIssues = [...issues];
+                                        const idx = newIssues.findIndex(i => i.id === issue.id);
+                                        if (idx >= 0) {
+                                          newIssues[idx].satisfaction_rating = value;
+                                          setTaskDetail({ ...taskDetail, issues: newIssues });
+                                        }
+                                        await taskAPI.submitSatisfactionRating(issue.id, value);
+                                        message.success('评分已保存');
+                                      } catch (error) {
+                                        message.error('评分保存失败');
+                                      }
+                                    }}
+                                    style={{ fontSize: 14 }}
+                                  />
+                                  {issue.satisfaction_rating && (
+                                    <Text style={{ fontSize: 11, color: '#8c8c8c' }}>
+                                      {issue.satisfaction_rating}星
+                                    </Text>
+                                  )}
+                                </Space>
+                              </div>
+                            </div>
                           </div>
 
                           {/* 详情信息 - 默认折叠 */}
@@ -804,8 +887,67 @@ const TaskDetailEnhanced: React.FC = () => {
             ) : aiOutputs.length === 0 ? (
               <Empty description="暂无AI输出记录" />
             ) : (
-              <div className="ai-outputs-container">
-                {aiOutputs.map((output, index) => (
+              <>
+                {/* AI输出筛选器 */}
+                <Card className="filter-card" size="small" style={{ marginBottom: 16 }}>
+                  <Space size={16} wrap>
+                    <Space size={8}>
+                      <Text strong>操作类型:</Text>
+                      <Radio.Group 
+                        value={aiOutputFilter} 
+                        onChange={(e) => setAiOutputFilter(e.target.value)}
+                        size="small"
+                      >
+                        <Radio.Button value="all">
+                          全部 ({aiOutputs.length})
+                        </Radio.Button>
+                        <Radio.Button value="preprocess">
+                          <Tag color="blue">预处理 ({aiOutputs.filter(o => o.operation_type === 'preprocess').length})</Tag>
+                        </Radio.Button>
+                        <Radio.Button value="detect_issues">
+                          <Tag color="orange">问题检测 ({aiOutputs.filter(o => o.operation_type === 'detect_issues').length})</Tag>
+                        </Radio.Button>
+                      </Radio.Group>
+                    </Space>
+                    <Divider type="vertical" />
+                    <Space size={8}>
+                      <Text strong>执行状态:</Text>
+                      <Radio.Group 
+                        value={aiStatusFilter}
+                        onChange={(e) => setAiStatusFilter(e.target.value)}
+                        size="small"
+                      >
+                        <Radio.Button value="all">
+                          全部
+                        </Radio.Button>
+                        <Radio.Button value="success">
+                          <Tag color="green">成功 ({aiOutputs.filter(o => o.status === 'success').length})</Tag>
+                        </Radio.Button>
+                        <Radio.Button value="failed">
+                          <Tag color="red">失败 ({aiOutputs.filter(o => o.status !== 'success').length})</Tag>
+                        </Radio.Button>
+                      </Radio.Group>
+                    </Space>
+                  </Space>
+                </Card>
+
+                <div className="ai-outputs-container">
+                {aiOutputs
+                  .filter(output => {
+                    // 操作类型过滤
+                    if (aiOutputFilter !== 'all' && output.operation_type !== aiOutputFilter) {
+                      return false;
+                    }
+                    // 执行状态过滤
+                    if (aiStatusFilter === 'success' && output.status !== 'success') {
+                      return false;
+                    }
+                    if (aiStatusFilter === 'failed' && output.status === 'success') {
+                      return false;
+                    }
+                    return true;
+                  })
+                  .map((output, index) => (
                   <Card 
                     key={output.id} 
                     className="ai-output-card"
@@ -932,7 +1074,8 @@ const TaskDetailEnhanced: React.FC = () => {
                     </Collapse>
                   </Card>
                 ))}
-              </div>
+                </div>
+              </>
             )}
           </Tabs.TabPane>
         </Tabs>

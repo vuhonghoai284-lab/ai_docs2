@@ -15,6 +15,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { taskAPI } from '../api';
 import { Task } from '../types';
+import './TaskList.css';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -185,9 +186,9 @@ const TaskList: React.FC = () => {
 
   const columns = [
     {
-      title: '文件',
+      title: '文件信息',
       key: 'file',
-      width: '25%',
+      width: '30%',
       render: (_: any, record: Task) => (
         <Space>
           {getFileIcon(record.file_name)}
@@ -198,7 +199,7 @@ const TaskList: React.FC = () => {
             </Text>
             {record.document_chars && (
               <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
-                文档: {formatChars(record.document_chars)}
+                字符数: {formatChars(record.document_chars)}
               </Text>
             )}
           </div>
@@ -206,27 +207,76 @@ const TaskList: React.FC = () => {
       ),
     },
     {
+      title: '创建人',
+      key: 'creator',
+      width: '10%',
+      render: (_: any, record: Task) => (
+        <div>
+          <div style={{ fontWeight: 500, fontSize: 13 }}>
+            {record.created_by_name || record.created_by || '系统'}
+          </div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {record.created_by_type === 'admin' ? '管理员' : '用户'}
+          </Text>
+        </div>
+      ),
+    },
+    {
       title: '模型',
       key: 'model',
-      width: '12%',
+      width: '13%',
       render: (_: any, record: Task) => (
-        record.model_label ? (
-          <Tooltip title={record.model_label}>
+        record.ai_model_label ? (
+          <Tooltip title={record.ai_model_label}>
             <Tag color="blue" style={{ fontSize: 11 }}>
-              {record.model_label.length > 10 
-                ? record.model_label.substring(0, 10) + '...' 
-                : record.model_label}
+              {record.ai_model_label.length > 10 
+                ? record.ai_model_label.substring(0, 10) + '...' 
+                : record.ai_model_label}
             </Tag>
           </Tooltip>
         ) : '-'
       ),
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: '10%',
-      render: (status: string) => getStatusTag(status),
+      title: '状态与进度',
+      key: 'status_progress',
+      width: '15%',
+      render: (_: any, record: Task) => (
+        <div>
+          <div style={{ marginBottom: 8 }}>
+            {getStatusTag(record.status)}
+          </div>
+          {record.status === 'completed' ? (
+            <div>
+              {record.processing_time && (
+                <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+                  耗时: {formatTime(record.processing_time)}
+                </div>
+              )}
+            </div>
+          ) : record.status === 'failed' ? (
+            <div style={{ fontSize: 11, color: '#ff4d4f', marginTop: 2 }}>
+              {record.error_message ? `错误: ${record.error_message.substring(0, 30)}...` : '处理失败'}
+            </div>
+          ) : record.status === 'processing' ? (
+            <div>
+              <Progress 
+                percent={Math.round(record.progress)} 
+                size="small"
+                strokeColor="#1890ff"
+                format={(percent) => `${percent}%`}
+              />
+              <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
+                正在处理中...
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
+              等待处理
+            </div>
+          )}
+        </div>
+      ),
       filters: [
         { text: '等待中', value: 'pending' },
         { text: '处理中', value: 'processing' },
@@ -236,53 +286,80 @@ const TaskList: React.FC = () => {
       onFilter: (value: any, record: Task) => record.status === value,
     },
     {
-      title: '进度',
-      dataIndex: 'progress',
-      key: 'progress',
-      width: '12%',
-      render: (progress: number, record: Task) => (
-        record.status === 'completed' ? (
-          <Space direction="vertical" size={0}>
-            <Space size={4}>
-              <CheckCircleOutlined style={{ color: '#52c41a' }} />
-              <Text type="success">完成</Text>
-            </Space>
-            {record.processing_time && (
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                耗时: {formatTime(record.processing_time)}
-              </Text>
-            )}
-          </Space>
-        ) : record.status === 'failed' ? (
-          <Space>
-            <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
-            <Text type="danger">失败</Text>
-          </Space>
-        ) : (
-          <Progress 
-            percent={Math.round(progress)} 
-            size="small"
-          />
-        )
-      ),
-    },
-    {
-      title: '问题数',
-      key: 'issues',
-      width: '8%',
+      title: '问题统计',
+      key: 'issue_stats',
+      width: '15%',
       render: (_: any, record: Task) => (
-        record.status === 'completed' ? (
-          <Badge count={record.issue_count || 0} showZero>
-            <ExclamationCircleOutlined style={{ fontSize: 16 }} />
-          </Badge>
-        ) : '-'
+        <div>
+          {record.status === 'completed' ? (
+            <div>
+              {record.issue_count !== undefined ? (
+                <div>
+                  <div style={{ fontSize: 12, color: '#262626', fontWeight: 500 }}>
+                    发现 {record.issue_count} 个问题
+                  </div>
+                  {record.processed_issues !== undefined && (
+                    <div style={{ fontSize: 11, color: '#52c41a', marginTop: 2 }}>
+                      已处理: {record.processed_issues}
+                    </div>
+                  )}
+                  {/* 问题处理进度条 */}
+                  {record.issue_count > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      <Progress 
+                        percent={record.processed_issues ? Math.round((record.processed_issues / record.issue_count) * 100) : 0} 
+                        size="small"
+                        strokeColor="#52c41a"
+                        trailColor="#f0f0f0"
+                        format={(percent) => `${percent}%`}
+                        style={{ fontSize: 10 }}
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+                  无问题数据
+                </div>
+              )}
+            </div>
+          ) : record.status === 'processing' ? (
+            <div>
+              {record.issue_count !== undefined && record.issue_count > 0 ? (
+                <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+                  预计发现 {record.issue_count} 个问题
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+                  分析中...
+                </div>
+              )}
+            </div>
+          ) : record.status === 'pending' ? (
+            <div>
+              {record.issue_count !== undefined && record.issue_count > 0 ? (
+                <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+                  上次: {record.issue_count} 个问题
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+                  待分析
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+              -
+            </div>
+          )}
+        </div>
       ),
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
-      width: '12%',
+      width: '10%',
       render: (date: string) => (
         <Tooltip title={new Date(date).toLocaleString('zh-CN')}>
           <Text style={{ fontSize: 12 }}>
@@ -349,190 +426,228 @@ const TaskList: React.FC = () => {
     },
   };
 
+  const getStatusText = (status: string) => {
+    const statusMap: { [key: string]: string } = {
+      pending: '等待中',
+      processing: '处理中',
+      completed: '已完成',
+      failed: '失败',
+    };
+    return statusMap[status] || '未知';
+  };
+
   const renderTaskCard = (task: Task) => (
-    <Col xs={24} sm={12} md={8} lg={6} key={task.id}>
-      <Card
-        hoverable
-        size="small"
-        style={{ marginBottom: 16 }}
-        actions={[
-          <Tooltip title="查看详情">
-            <EyeOutlined onClick={() => navigate(`/task/${task.id}`)} />
-          </Tooltip>,
-          task.status === 'completed' ? (
-            <Tooltip title="下载报告">
-              <DownloadOutlined onClick={() => handleDownloadReport(task.id)} />
-            </Tooltip>
-          ) : task.status === 'failed' ? (
-            <Tooltip title="重试">
-              <ReloadOutlined onClick={() => handleRetry(task.id)} />
-            </Tooltip>
-          ) : (
-            <BarChartOutlined style={{ color: '#d9d9d9' }} />
-          ),
+    <Card
+      key={task.id}
+      className="task-card-item"
+      onClick={() => navigate(`/task/${task.id}`)}
+      title={
+        <div className="task-card-header">
+          <h3 className="task-card-title">{task.title || task.file_name}</h3>
+          <div className="task-card-meta">
+            {getFileIcon(task.file_name)}
+            <Tag className={`status-tag status-${task.status}`}>
+              {getStatusText(task.status)}
+            </Tag>
+          </div>
+        </div>
+      }
+    >
+      <div className="task-card-body">
+        {task.status === 'processing' && (
+          <div className="task-progress-section">
+            <div className="task-progress-label">
+              <span>处理进度</span>
+              <span>{Math.round(task.progress)}%</span>
+            </div>
+            <Progress percent={Math.round(task.progress)} strokeColor="#74b9ff" />
+          </div>
+        )}
+        
+        <div className="task-info-grid">
+          <div className="task-info-item">
+            <div className="task-info-label">文件大小</div>
+            <div className="task-info-value">{formatFileSize(task.file_size)}</div>
+          </div>
+          <div className="task-info-item">
+            <div className="task-info-label">创建时间</div>
+            <div className="task-info-value">{new Date(task.created_at).toLocaleDateString('zh-CN')}</div>
+          </div>
+          {task.document_chars && (
+            <div className="task-info-item">
+              <div className="task-info-label">文档字符</div>
+              <div className="task-info-value">{formatChars(task.document_chars)}</div>
+            </div>
+          )}
+          {task.status === 'completed' && task.issue_count !== undefined && (
+            <div className="task-info-item">
+              <div className="task-info-label">发现问题</div>
+              <div className="task-info-value">
+                {task.issue_count} 个
+                {task.processed_issues !== undefined && (
+                  <div style={{ fontSize: 10, color: '#52c41a', marginTop: 2 }}>
+                    已处理: {task.processed_issues}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {/* 问题处理进度 - 仅在已完成且有问题时显示 */}
+          {task.status === 'completed' && task.issue_count !== undefined && task.issue_count > 0 && (
+            <div className="task-info-item" style={{ gridColumn: 'span 2' }}>
+              <div className="task-info-label">处理进度</div>
+              <div className="task-info-value" style={{ width: '100%' }}>
+                <Progress 
+                  percent={task.processed_issues ? Math.round((task.processed_issues / task.issue_count) * 100) : 0} 
+                  size="small"
+                  strokeColor="#52c41a"
+                  trailColor="#f0f0f0"
+                  format={(percent) => `${percent}%`}
+                  style={{ fontSize: 10 }}
+                />
+                <div style={{ fontSize: 10, color: '#8c8c8c', marginTop: 2 }}>
+                  {task.processed_issues || 0}/{task.issue_count} 已处理
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="task-actions">
+          <Button
+            type="text"
+            icon={<EyeOutlined />}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/task/${task.id}`);
+            }}
+          >
+            查看
+          </Button>
+          {task.status === 'completed' && (
+            <Button
+              type="text"
+              icon={<DownloadOutlined />}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDownloadReport(task.id);
+              }}
+            >
+              报告
+            </Button>
+          )}
+          {task.status === 'failed' && (
+            <Button
+              type="text"
+              icon={<ReloadOutlined />}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRetry(task.id);
+              }}
+            >
+              重试
+            </Button>
+          )}
           <Popconfirm
             title="确定删除该任务吗？"
-            onConfirm={() => handleDelete(task.id)}
+            onConfirm={() => {
+              handleDelete(task.id);
+            }}
             okText="确定"
             cancelText="取消"
           >
-            <DeleteOutlined style={{ color: '#ff4d4f' }} />
-          </Popconfirm>,
-        ]}
-      >
-        <Card.Meta
-          avatar={getFileIcon(task.file_name)}
-          title={
-            <div style={{ fontSize: 14 }}>
-              {task.title || task.file_name}
-              <div style={{ marginTop: 4 }}>
-                {getStatusTag(task.status)}
-              </div>
-            </div>
-          }
-          description={
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                {task.file_name}
-              </Text>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                {formatFileSize(task.file_size)}
-                {task.document_chars && ` · ${formatChars(task.document_chars)}`}
-              </Text>
-              {task.model_label && (
-                <Tag color="blue" style={{ fontSize: 10, marginTop: 4 }}>
-                  {task.model_label}
-                </Tag>
-              )}
-              {task.status === 'processing' && (
-                <Progress percent={Math.round(task.progress)} size="small" />
-              )}
-              {task.status === 'completed' && (
-                <Space>
-                  <Badge count={task.issue_count || 0} showZero>
-                    <Text style={{ fontSize: 12 }}>检测到问题</Text>
-                  </Badge>
-                  {task.processing_time && (
-                    <Text type="secondary" style={{ fontSize: 11 }}>
-                      耗时{formatTime(task.processing_time)}
-                    </Text>
-                  )}
-                </Space>
-              )}
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {new Date(task.created_at).toLocaleDateString('zh-CN')}
-              </Text>
-            </Space>
-          }
-        />
-      </Card>
-    </Col>
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={(e) => e.stopPropagation()}
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        </div>
+      </div>
+    </Card>
   );
 
   return (
-    <Space direction="vertical" style={{ width: '100%' }} size="large">
-      {/* 统计卡片 */}
-      <Row gutter={16}>
-        <Col xs={24} sm={12} md={4}>
-          <Card size="small">
-            <Statistic
-              title="总任务数"
-              value={statistics.total}
-              prefix={<FileTextOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={5}>
-          <Card size="small">
-            <Statistic
-              title="等待中"
-              value={statistics.pending}
-              prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: '#8c8c8c' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={5}>
-          <Card size="small">
-            <Statistic
-              title="处理中"
-              value={statistics.processing}
-              prefix={<SyncOutlined spin />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={5}>
-          <Card size="small">
-            <Statistic
-              title="已完成"
-              value={statistics.completed}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={5}>
-          <Card size="small">
-            <Statistic
-              title="失败"
-              value={statistics.failed}
-              prefix={<CloseCircleOutlined />}
-              valueStyle={{ color: '#ff4d4f' }}
-            />
-          </Card>
-        </Col>
-      </Row>
+    <div className="task-list-container">
+      {/* 页面标题 */}
+      <div className="task-list-header">
+        <h1 className="task-list-title">任务管理中心</h1>
+        <p style={{ margin: '8px 0 0 0', color: '#64748b' }}>
+          智能文档检测，全流程任务管理
+        </p>
+        
+        {/* 统计卡片 */}
+        <Row gutter={[16, 16]} className="task-stats-row">
+          <Col xs={24} sm={12} md={4}>
+            <Card className="task-stat-card">
+              <FileTextOutlined className="stat-icon total" />
+              <Statistic
+                title="总任务数"
+                value={statistics.total}
+                valueStyle={{ color: '#1890ff', fontWeight: 700 }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={5}>
+            <Card className="task-stat-card">
+              <ClockCircleOutlined className="stat-icon pending" style={{ color: '#faad14' }} />
+              <Statistic
+                title="等待中"
+                value={statistics.pending}
+                valueStyle={{ color: '#faad14', fontWeight: 700 }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={5}>
+            <Card className="task-stat-card">
+              <SyncOutlined spin className="stat-icon processing" style={{ color: '#1890ff' }} />
+              <Statistic
+                title="处理中"
+                value={statistics.processing}
+                valueStyle={{ color: '#1890ff', fontWeight: 700 }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={5}>
+            <Card className="task-stat-card">
+              <CheckCircleOutlined className="stat-icon completed" />
+              <Statistic
+                title="已完成"
+                value={statistics.completed}
+                valueStyle={{ color: '#52c41a', fontWeight: 700 }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={5}>
+            <Card className="task-stat-card">
+              <CloseCircleOutlined className="stat-icon failed" />
+              <Statistic
+                title="失败"
+                value={statistics.failed}
+                valueStyle={{ color: '#f5222d', fontWeight: 700 }}
+              />
+            </Card>
+          </Col>
+        </Row>
+      </div>
 
-      {/* 主内容卡片 */}
-      <Card
-        title={
-          <Space>
-            <span>任务管理</span>
-            <Badge count={statistics.processing} dot={statistics.processing > 0}>
-              <span style={{ fontSize: 14, color: '#8c8c8c' }}>
-                {statistics.processing > 0 && `(${statistics.processing} 个进行中)`}
-              </span>
-            </Badge>
-          </Space>
-        }
-        extra={
-          <Space>
-            <Segmented
-              options={[
-                { value: 'table', icon: <FilterOutlined /> },
-                { value: 'card', icon: <BarChartOutlined /> },
-              ]}
-              value={viewMode}
-              onChange={(value) => setViewMode(value as 'table' | 'card')}
-            />
-            <Button icon={<ReloadOutlined />} onClick={loadTasks}>
-              刷新
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate('/create')}
-            >
-              新建任务
-            </Button>
-          </Space>
-        }
-      >
-        {/* 搜索和筛选栏 */}
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col xs={24} sm={12} md={8}>
+      {/* 控制面板 */}
+      <div className="task-controls">
+        <div className="task-controls-row">
+          <div className="task-controls-left">
             <Input
+              className="search-input"
               placeholder="搜索文件名或标题..."
               prefix={<SearchOutlined />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               allowClear
             />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
             <Select
-              style={{ width: '100%' }}
+              className="filter-select"
               placeholder="状态筛选"
               value={statusFilter}
               onChange={setStatusFilter}
@@ -543,32 +658,66 @@ const TaskList: React.FC = () => {
               <Option value="completed">已完成</Option>
               <Option value="failed">失败</Option>
             </Select>
-          </Col>
-          {selectedRowKeys.length > 0 && (
-            <Col xs={24} sm={12} md={10}>
-              <Space>
-                <Text>已选择 {selectedRowKeys.length} 项</Text>
-                <Popconfirm
-                  title={`确定删除选中的 ${selectedRowKeys.length} 个任务吗？`}
-                  onConfirm={handleBatchDelete}
-                  okText="确定"
-                  cancelText="取消"
-                >
-                  <Button danger size="small" icon={<DeleteOutlined />}>
-                    批量删除
-                  </Button>
-                </Popconfirm>
-                <Button size="small" onClick={() => setSelectedRowKeys([])}>
-                  取消选择
-                </Button>
-              </Space>
-            </Col>
-          )}
-        </Row>
+          </div>
+          <div className="task-controls-right">
+            <Segmented
+              className="view-mode-segmented"
+              options={[
+                { value: 'table', icon: <FilterOutlined />, label: '表格' },
+                { value: 'card', icon: <BarChartOutlined />, label: '卡片' },
+              ]}
+              value={viewMode}
+              onChange={(value) => setViewMode(value as 'table' | 'card')}
+            />
+            <Button
+              className="action-button"
+              icon={<ReloadOutlined />}
+              onClick={loadTasks}
+              loading={loading}
+            >
+              刷新
+            </Button>
+            <Button
+              className="action-button primary"
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => navigate('/create')}
+            >
+              新建任务
+            </Button>
+          </div>
+        </div>
+      </div>
 
-        {/* 任务列表/卡片视图 */}
-        {viewMode === 'table' ? (
+      {/* 批量操作栏 */}
+      {selectedRowKeys.length > 0 && (
+        <div className="batch-actions-bar">
+          <div className="batch-actions-info">
+            已选择 <strong>{selectedRowKeys.length}</strong> 个任务
+          </div>
+          <div className="batch-actions-buttons">
+            <Button onClick={() => setSelectedRowKeys([])}>
+              取消选择
+            </Button>
+            <Popconfirm
+              title={`确定删除选中的 ${selectedRowKeys.length} 个任务吗？`}
+              onConfirm={handleBatchDelete}
+              okText="确定"
+              cancelText="取消"
+            >
+              <Button danger icon={<DeleteOutlined />}>
+                批量删除
+              </Button>
+            </Popconfirm>
+          </div>
+        </div>
+      )}
+
+      {/* 主内容区域 */}
+      {viewMode === 'table' ? (
+        <div className="task-table-container">
           <Table
+            className="task-table"
             rowSelection={rowSelection}
             columns={columns}
             dataSource={filteredTasks}
@@ -582,29 +731,43 @@ const TaskList: React.FC = () => {
             }}
             locale={{
               emptyText: (
-                <Empty
-                  description={searchText || statusFilter !== 'all' ? '没有符合条件的任务' : '暂无任务'}
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                />
-              ),
+                <div className="empty-state">
+                  <FileTextOutlined className="empty-icon" />
+                  <div className="empty-title">暂无任务</div>
+                  <div className="empty-description">点击"新建任务"开始您的文档检测之旅</div>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => navigate('/create')}
+                  >
+                    立即创建
+                  </Button>
+                </div>
+              )
             }}
           />
+        </div>
+      ) : (
+        filteredTasks.length > 0 ? (
+          <div className="task-cards-grid">
+            {filteredTasks.map(renderTaskCard)}
+          </div>
         ) : (
-          <Row gutter={[16, 16]}>
-            {filteredTasks.length > 0 ? (
-              filteredTasks.map(task => renderTaskCard(task))
-            ) : (
-              <Col span={24}>
-                <Empty
-                  description={searchText || statusFilter !== 'all' ? '没有符合条件的任务' : '暂无任务'}
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                />
-              </Col>
-            )}
-          </Row>
-        )}
-      </Card>
-    </Space>
+          <div className="empty-state">
+            <FileTextOutlined className="empty-icon" />
+            <div className="empty-title">暂无任务</div>
+            <div className="empty-description">点击"新建任务"开始您的文档检测之旅</div>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => navigate('/create')}
+            >
+              立即创建
+            </Button>
+          </div>
+        )
+      )}
+    </div>
   );
 };
 

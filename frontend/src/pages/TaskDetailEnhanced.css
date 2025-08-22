@@ -32,15 +32,161 @@
   padding-right: 8px;
 }
 
-/* 问题卡片 */
-.task-detail-enhanced .issue-card {
-  margin-bottom: 6px;
-  border-left: 3px solid transparent;
+/* 增强版问题卡片 */
+.task-detail-enhanced .issue-card-enhanced {
+  margin-bottom: 16px;
+  border-left: 4px solid transparent;
   transition: all 0.3s ease;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.task-detail-enhanced .issue-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+.task-detail-enhanced .issue-card-enhanced:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+/* 紧凑式问题头部布局 */
+.task-detail-enhanced .issue-header-compact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.task-detail-enhanced .issue-main-info {
+  flex: 1;
+  min-width: 0; /* 允许内容收缩 */
+}
+
+.task-detail-enhanced .issue-main-info .issue-number {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.task-detail-enhanced .issue-main-info .issue-type-tag {
+  font-size: 11px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.task-detail-enhanced .issue-main-info .issue-description {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-detail-enhanced .issue-status-section {
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.task-detail-enhanced .issue-type-tag {
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.task-detail-enhanced .issue-description {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* 问题内容行 - 单行显示 */
+.task-detail-enhanced .issue-content-row {
+  padding: 8px 16px;
+  background: #fafbfc;
+}
+
+.task-detail-enhanced .issue-content-row:last-child {
+  padding-bottom: 12px;
+}
+
+.task-detail-enhanced .content-section {
+  margin-bottom: 6px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border-left: 3px solid transparent;
+}
+
+.task-detail-enhanced .content-section:last-child {
+  margin-bottom: 0;
+}
+
+.task-detail-enhanced .content-section.original {
+  background: #fff2f0;
+  border-left-color: #ff7875;
+}
+
+.task-detail-enhanced .content-section.suggestion {
+  background: #f6ffed;
+  border-left-color: #73d13d;
+}
+
+/* 操作行样式 */
+.task-detail-enhanced .issue-actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #ffffff;
+  border-top: 1px solid #f0f0f0;
+}
+
+.task-detail-enhanced .actions-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.task-detail-enhanced .actions-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+.task-detail-enhanced .satisfaction-rating-compact {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: #fff7e6;
+  border-radius: 6px;
+  border: 1px solid #ffe58f;
+}
+
+/* 快速操作区域 */
+.task-detail-enhanced .quick-actions {
+  padding: 12px 16px;
+  background: #ffffff;
+}
+
+.task-detail-enhanced .actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.task-detail-enhanced .actions-row.processed {
+  background: #f0f9ff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #bae7ff;
+}
+
+.task-detail-enhanced .rating-display {
+  display: flex;
+  align-items: center;
+  background: #fff7e6;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #ffe58f;
 }
 
 /* 根据严重程度设置边框颜色 */
@@ -96,12 +242,6 @@
 
 .task-detail-enhanced .issue-header-left {
   flex: 1;
-}
-
-.task-detail-enhanced .issue-number {
-  font-weight: 600;
-  color: #595959;
-  font-size: 14px;
 }
 
 /* 对比展示区 */

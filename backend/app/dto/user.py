@@ -1,7 +1,7 @@
 """
 用户相关的数据传输对象
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -12,8 +12,8 @@ class UserBase(BaseModel):
     display_name: Optional[str] = None
     email: Optional[str] = None
     avatar_url: Optional[str] = None
-    is_admin: bool = False
-    is_system_admin: bool = False
+    is_admin: Optional[bool] = False
+    is_system_admin: Optional[bool] = False
 
 
 class UserCreate(UserBase):
@@ -32,11 +32,10 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     """用户响应模型"""
     id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserLoginResponse(BaseModel):

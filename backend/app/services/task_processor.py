@@ -102,9 +102,8 @@ class TaskProcessor:
                 file_path = Path(file_info.file_path)
             
             if file_path and file_path.exists():
-                # 优先读取真实文件
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    file_content = f.read()
+                # 根据文件类型读取文件内容
+                file_content = await self._read_file_content(file_path, file_name)
             elif self.settings.is_test_mode:
                 # 测试模式下，如果文件不存在，使用模拟内容
                 file_content = self._generate_test_content(file_name)
@@ -280,3 +279,103 @@ class TaskProcessor:
         
         # 实时推送
         await manager.send_log(task_id, level, message, stage, progress)
+    
+    async def _read_file_content(self, file_path: Path, file_name: str) -> str:
+        """根据文件类型读取文件内容"""
+        file_extension = file_path.suffix.lower()
+        
+        try:
+            if file_extension == '.pdf':
+                # PDF文件处理
+                return await self._read_pdf_file(file_path)
+            elif file_extension in ['.docx', '.doc']:
+                # Word文档处理
+                return await self._read_word_file(file_path)
+            elif file_extension in ['.md', '.txt']:
+                # 文本文件处理
+                return await self._read_text_file(file_path)
+            else:
+                # 默认尝试文本文件处理
+                return await self._read_text_file(file_path)
+        except Exception as e:
+            raise ValueError(f"文件读取失败 [{file_name}]: {str(e)}")
+    
+    async def _read_pdf_file(self, file_path: Path) -> str:
+        """读取PDF文件内容"""
+        try:
+            import PyPDF2
+            text_content = ""
+            
+            with open(file_path, 'rb') as file:
+                pdf_reader = PyPDF2.PdfReader(file)
+                num_pages = len(pdf_reader.pages)
+                
+                for page_num in range(num_pages):
+                    page = pdf_reader.pages[page_num]
+                    text_content += page.extract_text() + "\n"
+            
+            if not text_content.strip():
+                return "PDF文件无法提取文本内容，可能是扫描版PDF或包含复杂格式。"
+            
+            return text_content.strip()
+            
+        except ImportError:
+            # 如果没有PyPDF2库，返回提示信息
+            return f"PDF文件解析需要安装PyPDF2库。文件路径: {file_path}"
+        except Exception as e:
+            raise ValueError(f"PDF文件解析失败: {str(e)}")
+    
+    async def _read_word_file(self, file_path: Path) -> str:
+        """读取Word文档内容"""
+        try:
+            import docx
+            doc = docx.Document(file_path)
+            text_content = ""
+            
+            for paragraph in doc.paragraphs:
+                text_content += paragraph.text + "\n"
+            
+            if not text_content.strip():
+                return "Word文档无法提取文本内容。"
+            
+            return text_content.strip()
+            
+        except ImportError:
+            # 如果没有python-docx库，返回提示信息
+            return f"Word文档解析需要安装python-docx库。文件路径: {file_path}"
+        except Exception as e:
+            raise ValueError(f"Word文档解析失败: {str(e)}")
+    
+    async def _read_text_file(self, file_path: Path) -> str:
+        """读取文本文件内容"""
+        # 尝试多种编码
+        encodings = ['utf-8', 'gbk', 'gb2312', 'utf-16', 'latin-1']
+        
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding) as f:
+                    content = f.read()
+                    if content.strip():  # 确保内容不为空
+                        return content
+            except (UnicodeDecodeError, UnicodeError):
+                continue
+            except Exception as e:
+                raise ValueError(f"文本文件读取失败: {str(e)}")
+        
+        # 所有编码都失败，尝试二进制读取并转换
+        try:
+            with open(file_path, 'rb') as f:
+                raw_content = f.read()
+                # 尝试检测编码
+                import chardet
+                detected = chardet.detect(raw_content)
+                if detected['encoding']:
+                    return raw_content.decode(detected['encoding'], errors='ignore')
+                else:
+                    return raw_content.decode('utf-8', errors='ignore')
+        except ImportError:
+            # 如果没有chardet库，用ignore错误的方式读取
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+        except Exception as e:
+            raise ValueError(f"文件读取完全失败: {str(e)}")
