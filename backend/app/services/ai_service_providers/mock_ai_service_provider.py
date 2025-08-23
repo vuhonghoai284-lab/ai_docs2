@@ -4,7 +4,6 @@ Mock AI服务提供者 - 实现新的抽象接口
 import json
 from typing import List, Dict, Any, Optional, Callable
 from app.services.interfaces.ai_service import IAIServiceProvider, IAIDocumentProcessor, IAIIssueDetector
-from app.services.mock_ai_service import MockAIService
 
 
 class MockAIDocumentProcessor(IAIDocumentProcessor):

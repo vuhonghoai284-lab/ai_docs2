@@ -7,6 +7,9 @@ import os
 import argparse
 import uvicorn
 from pathlib import Path
+from dotenv import load_dotenv 
+
+load_dotenv()
 
 def main():
     """主函数"""

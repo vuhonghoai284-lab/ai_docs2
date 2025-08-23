@@ -45,7 +45,9 @@
       "Bash(git push -u origin fix/ai-service-provider-factory-typeerror)",
       "Bash(git commit -m \"修复AI服务提供者工厂中的TypeError错误\n\n- 修正了service_provider_factory.py中对模型配置的访问方式\n- 添加了针对AI服务提供者工厂的单元测试\n\nThis PR fixes a TypeError that was occurring when accessing model configuration in the AI service provider factory. The issue was caused by incorrectly accessing the model configuration structure.\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")",
       "Bash(git commit -m \"修复AI服务提供者工厂中的TypeError错误\n\n- 修正了service_provider_factory.py中对模型配置的访问方式\n- 添加了针对AI服务提供者工厂的单元测试\n\nThis PR fixes a TypeError that was occurring when accessing model configuration in the AI service provider factory. The issue was caused by incorrectly accessing the model configuration structure.\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")",
-      "Bash(git add -A)"
+      "Bash(git add -A)",
+      "Bash(git commit -m \"修复AI服务提供者工厂中的TypeError错误\n\n- 修正了service_provider_factory.py中对模型配置的访问方式\n- 添加了针对AI服务提供者工厂的单元测试\n\nThis PR fixes a TypeError that was occurring when accessing model configuration in the AI service provider factory. The issue was caused by incorrectly accessing the model configuration structure.\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\")",
+      "Bash(git push origin fix/ai-service-provider-factory-typeerror)"
     ],
     "defaultMode": "acceptEdits"
   }
