@@ -108,9 +108,9 @@ class TaskService(ITaskService):
             model_id=ai_model.id
         )
         
-        # 异步处理任务
-        from app.services.task_processor import TaskProcessor
-        processor = TaskProcessor(self.db)
+        # 异步处理任务 - 使用新的责任链处理器
+        from app.services.new_task_processor import NewTaskProcessor
+        processor = NewTaskProcessor(self.db)
         asyncio.create_task(processor.process_task(task.id))
         
         # 获取关联数据构建响应

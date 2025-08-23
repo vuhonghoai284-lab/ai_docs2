@@ -33,11 +33,9 @@ class SystemView:
     
     def root(self):
         """根路径"""
-        mode = "测试模式" if self.settings.is_test_mode else "生产模式"
         return {
             "message": "AI文档测试系统后端API v2.0",
-            "mode": mode,
-            "test_mode": self.settings.is_test_mode
+            "mode": "生产模式"
         }
     
     def get_client_config(self):
@@ -61,7 +59,6 @@ class SystemView:
             "ws_base_url": ws_base_url,
             "app_title": "AI文档测试系统",
             "app_version": "2.0.0",
-            "test_mode": self.settings.is_test_mode,
             "supported_file_types": self.settings.file_settings.get('allowed_extensions', ['pdf', 'docx', 'md', 'txt']),
             "max_file_size": self.settings.file_settings.get('max_file_size', 10485760)
         }

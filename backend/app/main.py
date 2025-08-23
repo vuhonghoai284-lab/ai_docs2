@@ -14,9 +14,8 @@ from app.models import *
 # 获取配置
 settings = get_settings()
 
-# 创建数据库表（非测试模式下）
-if not settings.is_test_mode:
-    Base.metadata.create_all(bind=engine)
+# 创建数据库表
+Base.metadata.create_all(bind=engine)
 
 def create_app() -> FastAPI:
     """创建并配置FastAPI应用"""
@@ -67,15 +66,13 @@ def setup_startup_event(app: FastAPI):
         """应用启动时的初始化操作"""        
         from app.services.model_initializer import model_initializer
         
-        # 初始化AI模型配置到数据库（测试模式下也需要）
+        # 初始化AI模型配置到数据库
         db = next(get_db())
         try:
             models = model_initializer.initialize_models(db)
-            mode_text = "测试模式" if settings.is_test_mode else "生产模式"
-            print(f"✓ {mode_text} - 已初始化 {len(models)} 个AI模型")
+            print(f"✓ 已初始化 {len(models)} 个AI模型")
         except Exception as e:
-            mode_text = "测试模式" if settings.is_test_mode else "生产模式"
-            print(f"✗ {mode_text} - AI模型初始化失败: {e}")
+            print(f"✗ AI模型初始化失败: {e}")
         finally:
             db.close()
 

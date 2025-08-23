@@ -15,28 +15,15 @@ class Settings:
         if config_file:
             self.config_file = config_file
         else:
-            # 检查环境变量
-            env_mode = os.getenv('APP_MODE', 'production')
-            if env_mode == 'test':
-                self.config_file = "config.test.yaml"
-            else:
-                self.config_file = os.getenv('CONFIG_FILE', 'config.yaml')
+            self.config_file = os.getenv('CONFIG_FILE', 'config.yaml')
         
         self.config = self._load_config()
-        self._test_mode = self.config.get('test_mode', False)
         
     def _load_config(self) -> Dict[str, Any]:
         """加载配置文件"""
         config_path = Path(self.config_file)
         if not config_path.exists():
-            # 如果测试配置不存在，回退到默认配置
-            if self.config_file == "config.test.yaml":
-                print(f"测试配置文件不存在，使用默认配置")
-                self.config_file = "config.yaml"
-                config_path = Path(self.config_file)
-            
-            if not config_path.exists():
-                raise FileNotFoundError(f"配置文件不存在: {self.config_file}")
+            raise FileNotFoundError(f"配置文件不存在: {self.config_file}")
             
         print(f"加载配置文件: {self.config_file}")
         with open(config_path, 'r', encoding='utf-8') as f:
@@ -62,28 +49,10 @@ class Settings:
                     self._replace_env_vars(item)
     
     def _get_default_value(self, env_var: str, original_value: str) -> str:
-        """为环境变量提供测试模式下的默认值"""
-        # 测试模式下的默认值映射
-        test_defaults = {
-            'THIRD_PARTY_CLIENT_ID': 'test_client_id',
-            'THIRD_PARTY_CLIENT_SECRET': 'test_client_secret',
-            'FRONTEND_DOMAIN': 'http://localhost:5173',
-            'THIRD_PARTY_AUTH_URL': 'http://mock-auth-provider.com/oauth2/authorize',
-            'THIRD_PARTY_TOKEN_URL': 'http://mock-auth-provider.com/oauth2/accesstoken',
-            'THIRD_PARTY_USERINFO_URL': 'http://mock-auth-provider.com/oauth2/userinfo'
-        }
-        
-        # 如果是测试模式，返回测试默认值
-        if self.config_file == "config.test.yaml" or self._test_mode:
-            return test_defaults.get(env_var, original_value)
-        
-        # 生产模式下，如果环境变量不存在，返回空字符串而不是原始占位符
+        """为环境变量提供默认值"""
+        # 如果环境变量不存在，返回空字符串
         return ""
     
-    @property
-    def is_test_mode(self) -> bool:
-        """是否为测试模式"""
-        return self._test_mode
     
     @property
     def database_url(self) -> str:
@@ -166,26 +135,7 @@ class Settings:
         
         return filtered_origins
     
-    @property
-    def test_data_config(self) -> Dict[str, Any]:
-        """测试数据配置（仅测试模式下使用）"""
-        return self.config.get('test_data', {})
     
-    @property
-    def external_api_mock_config(self) -> Dict[str, Any]:
-        """外部API Mock配置"""
-        return self.config.get('external_api_mock', {})
-    
-    def get_mock_config(self, service_name: str) -> Dict[str, Any]:
-        """获取指定服务的Mock配置"""
-        return self.external_api_mock_config.get(service_name, {})
-    
-    def is_service_mocked(self, service_name: str) -> bool:
-        """检查指定服务是否需要mock（仅在测试模式下有效）"""
-        if not self.is_test_mode:
-            return False
-        mock_config = self.get_mock_config(service_name)
-        return mock_config.get('enabled', False)
     
     @property
     def server_config(self) -> Dict[str, Any]:
@@ -216,7 +166,6 @@ class Settings:
         if config_file:
             self.config_file = config_file
         self.config = self._load_config()
-        self._test_mode = self.config.get('test_mode', False)
 
 
 # 全局配置实例（延迟初始化）

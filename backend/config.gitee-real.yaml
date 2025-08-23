@@ -1,0 +1,132 @@
+# Gitee OAuth真实配置 - 基于提供的实际配置信息
+# 服务器配置
+server:
+  host: "0.0.0.0"
+  port: 8081
+  debug: false
+  reload: false
+  workers: 1
+
+# 数据库配置
+database: ./data/app.db
+
+# AI模型配置（保持现有结构）
+ai_models:
+  default_index: 0
+  models:
+    - label: "GPT-4o Mini (快速)"
+      provider: "openai"
+      config:
+        api_key: "${OPENAI_API_KEY}"
+        base_url: "https://api.openai.com/v1"
+        model: "gpt-4o-mini"
+        temperature: 0.3
+        max_tokens: 8000
+        context_window: 128000
+        reserved_tokens: 2000
+        timeout: 12000
+        max_retries: 3
+      description: "适合快速处理，成本较低"
+
+# 文件设置（保持现有结构）
+file_settings:
+  max_file_size: 10485760
+  chunk_size: 8000
+  allowed_extensions:
+    - pdf
+    - docx
+    - md
+    - txt
+
+# 目录配置（保持现有结构）
+directories:
+  upload_dir: ./data/uploads
+  report_dir: ./data/reports
+  log_dir: ./data/logs
+  temp_dir: ./data/temp
+
+# 日志配置（保持现有结构）
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./data/logs/app.log"
+  max_size: 10485760
+  backup_count: 5
+
+# 任务处理配置（保持现有结构）
+task_processing:
+  max_concurrent_tasks: 3
+  task_timeout: 12000
+  retry_failed_tasks: true
+
+# CORS配置（保持现有结构）
+cors:
+  enabled: true
+  origins:
+    - "http://localhost:3000"
+    - "http://localhost:3001"
+    - "http://localhost:3002"
+    - "http://localhost:3003"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:3000"
+    - "http://127.0.0.1:5173"
+    - "${FRONTEND_URL}"
+  allow_credentials: true
+  allow_methods: ["*"]
+  allow_headers: ["*"]
+  development_mode: "${CORS_DEVELOPMENT_MODE:false}"
+
+# 测试模式配置（保持现有结构）
+test_mode: false
+
+# 外部API Mock配置（真实环境禁用Mock）
+external_api_mock:
+  third_party_auth:
+    enabled: false  # 真实环境禁用第三方认证Mock
+    mock_delay: 0.1
+  ai_models:
+    enabled: true  # AI模型保持Mock，避免真实调用
+    mock_delay: 0.5
+  external_services:
+    enabled: true
+    mock_delay: 0.2
+
+# Gitee OAuth真实配置
+third_party_auth:
+  # 提供商类型：使用Gitee
+  provider_type: "gitee"
+  
+  # 实际的Gitee应用配置
+  client_id: "077b1f29dbb4c4fda233c93ba34676b00421b2b16d11abc36b38f6298e495876"
+  client_secret: "f3d0cfe1a3143a1b99ca58f234920f0ac63645e6272f65c5771a3a4e4f085fa4"
+  
+  # 回调配置 - 注意前端端口是3000
+  frontend_domain: "http://localhost:3000"
+  redirect_path: "/third-login/callback"
+  
+  # Gitee权限范围
+  scope: "user_info"
+  
+  # Gitee标准API端点（会自动设置，这里列出供参考）
+  api_endpoints:
+    authorization_url: "https://gitee.com/oauth/authorize"
+    token_url: "https://gitee.com/oauth/token"
+    userinfo_url: "https://gitee.com/api/v5/user"
+  
+  # 请求配置
+  request_timeout: 30
+  max_retries: 3
+
+# JWT配置（保持现有结构）
+jwt:
+  secret_key: "${JWT_SECRET_KEY:ai_doc_test_gitee_secret_key}"
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+
+# 环境变量映射
+env_mapping:
+  # 现有映射保持不变
+  OPENAI_API_KEY: "OPENAI_API_KEY"
+  JWT_SECRET_KEY: "JWT_SECRET_KEY"
+  FRONTEND_URL: "FRONTEND_URL"
+  CORS_DEVELOPMENT_MODE: "CORS_DEVELOPMENT_MODE"

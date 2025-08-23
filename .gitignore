@@ -46,6 +46,7 @@ yarn-error.log*
 backend/uploads/
 backend/reports/
 backend/data/
+!backend/config.yaml
 
 # IDE
 .vscode/
@@ -68,3 +69,7 @@ htmlcov/
 # Build outputs
 frontend/build/
 frontend/dist/
+
+
+# test
+frontend/test-results/

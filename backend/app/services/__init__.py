@@ -4,7 +4,6 @@
 from app.services.task import TaskService
 from app.services.task_processor import TaskProcessor
 from app.services.ai_service_factory import AIServiceFactory, ai_service_factory
-from app.services.mock_ai_service import MockAIService
 from app.services.websocket import manager
 from app.services.auth import AuthService
 from app.services.ai_service import AIService
@@ -18,7 +17,6 @@ __all__ = [
     "TaskProcessor", 
     "AIServiceFactory",
     "ai_service_factory",
-    "MockAIService",
     "manager",
     "AuthService",
     "AIService",

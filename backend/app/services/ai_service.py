@@ -44,22 +44,16 @@ class AIService:
                 db_session
             )
         else:
-            # 如果没有设置，使用模拟服务
-            self.services = {
-                'mock_service': None,
-                'document_processor': None,
-                'issue_detector': None
-            }
+            # 如果没有设置，抛出异常
+            raise ValueError("必须提供settings配置")
         
         self.logger.info(f"🤖 AI服务初始化完成，模型索引: {self.ai_model_index}")
         
         # 检查服务状态
         if self.services.get('document_processor') and self.services.get('issue_detector'):
-            self.logger.info("✅ 使用真实AI服务")
-            self.is_real_service = True
+            self.logger.info("✅ AI服务初始化完成")
         else:
-            self.logger.info("🔧 使用模拟AI服务")
-            self.is_real_service = False
+            raise ValueError("AI服务初始化失败")
     
     async def preprocess_document(self, text: str, task_id: Optional[int] = None, progress_callback: Optional[Callable] = None) -> List[Dict]:
         """
@@ -81,20 +75,10 @@ class AIService:
             await task_logger.info("开始文档预处理", {"text_length": len(text)})
         
         try:
-            if self.is_real_service and self.services.get('document_processor'):
-                # 使用真实的文档处理器
-                sections = await self.services['document_processor'].preprocess_document(
-                    text, task_id, progress_callback
-                )
-            else:
-                # 使用模拟服务或简单处理
-                if progress_callback:
-                    await progress_callback("使用简单文档分割...", 10)
-                
-                sections = self._simple_document_split(text)
-                
-                if progress_callback:
-                    await progress_callback(f"文档分割完成，共 {len(sections)} 个章节", 20)
+            # 使用文档处理器
+            sections = await self.services['document_processor'].preprocess_document(
+                text, task_id, progress_callback
+            )
             
             if task_id:
                 await task_logger.info(f"文档预处理完成，获得 {len(sections)} 个章节")
@@ -106,8 +90,7 @@ class AIService:
             if task_id:
                 await task_logger.error(f"文档预处理失败: {str(e)}")
             
-            # 降级到简单分割
-            return self._simple_document_split(text)
+            raise e
     
     async def detect_issues(self, text: str, progress_callback: Optional[Callable] = None, task_id: Optional[int] = None) -> List[Dict]:
         """
@@ -132,20 +115,10 @@ class AIService:
             # 先进行文档预处理
             sections = await self.preprocess_document(text, task_id, progress_callback)
             
-            if self.is_real_service and self.services.get('issue_detector'):
-                # 使用真实的问题检测器
-                issues = await self.services['issue_detector'].detect_issues(
-                    sections, task_id, progress_callback
-                )
-            else:
-                # 使用模拟服务
-                if progress_callback:
-                    await progress_callback("使用模拟问题检测...", 50)
-                
-                issues = self._mock_issue_detection(sections)
-                
-                if progress_callback:
-                    await progress_callback(f"问题检测完成，发现 {len(issues)} 个问题", 100)
+            # 使用问题检测器
+            issues = await self.services['issue_detector'].detect_issues(
+                sections, task_id, progress_callback
+            )
             
             if task_id:
                 await task_logger.info(f"问题检测完成，发现 {len(issues)} 个问题")
@@ -157,114 +130,6 @@ class AIService:
             if task_id:
                 await task_logger.error(f"问题检测失败: {str(e)}")
             
-            return []
+            raise e
     
-    def _simple_document_split(self, text: str) -> List[Dict]:
-        """
-        简单的文档分割方法（降级方案）
-        
-        Args:
-            text: 文档文本
-            
-        Returns:
-            章节列表
-        """
-        # 按段落分割，每个段落作为一个章节
-        paragraphs = text.split('\n\n')
-        sections = []
-        
-        for i, paragraph in enumerate(paragraphs):
-            if paragraph.strip() and len(paragraph.strip()) > 20:
-                sections.append({
-                    'section_title': f'第{i+1}段',
-                    'content': paragraph.strip(),
-                    'level': 1
-                })
-        
-        if not sections:
-            # 如果没有段落，整个文档作为一个章节
-            sections = [{
-                'section_title': '文档内容',
-                'content': text,
-                'level': 1
-            }]
-        
-        self.logger.info(f"简单文档分割完成，共 {len(sections)} 个章节")
-        return sections
     
-    def _mock_issue_detection(self, sections: List[Dict]) -> List[Dict]:
-        """
-        模拟问题检测（降级方案）
-        
-        Args:
-            sections: 章节列表
-            
-        Returns:
-            模拟问题列表
-        """
-        issues = []
-        
-        # 简单的规则检测
-        for section in sections:
-            content = section.get('content', '')
-            section_title = section.get('section_title', '未知章节')
-            
-            # 检查错别字（简单示例）
-            common_typos = ['的的', '了了', '是是', '在在']
-            for typo in common_typos:
-                if typo in content:
-                    issues.append({
-                        'type': '错别字',
-                        'description': f'发现重复字词：{typo}',
-                        'location': section_title,
-                        'severity': '一般',
-                        'confidence': 0.9,
-                        'suggestion': f'将"{typo}"修改为"{typo[0]}"',
-                        'original_text': typo,
-                        'user_impact': '影响阅读流畅性',
-                        'reasoning': '重复字词影响文档质量',
-                        'context': f'在章节"{section_title}"中发现'
-                    })
-            
-            # 检查句子长度
-            sentences = content.split('。')
-            for sentence in sentences:
-                if len(sentence) > 200:
-                    issues.append({
-                        'type': '句子过长',
-                        'description': '句子过长，建议拆分为多个短句以提高可读性',
-                        'location': section_title,
-                        'severity': '提示',
-                        'confidence': 0.7,
-                        'suggestion': '建议将长句拆分为多个短句',
-                        'original_text': sentence[:50] + '...',
-                        'user_impact': '可能影响理解',
-                        'reasoning': '过长的句子影响阅读理解',
-                        'context': f'在章节"{section_title}"中'
-                    })
-        
-        self.logger.info(f"模拟问题检测完成，发现 {len(issues)} 个问题")
-        return issues
-    
-    async def call_api(self, prompt: str) -> Dict:
-        """
-        通用API调用方法（保持兼容性）
-        
-        Args:
-            prompt: 提示词
-            
-        Returns:
-            API响应
-        """
-        try:
-            if self.services.get('mock_service'):
-                # 使用模拟服务
-                return await self.services['mock_service'].call_api(prompt)
-            else:
-                # 简单响应
-                return {
-                    "status": "success",
-                    "content": f"这是对提示词的模拟响应: {prompt[:100]}..."
-                }
-        except Exception as e:
-            return {"status": "error", "message": str(e)}

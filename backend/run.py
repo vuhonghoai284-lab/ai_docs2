@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-启动脚本 - 支持测试模式和生产模式
+启动脚本
 """
 import sys
 import os
@@ -11,12 +11,6 @@ from pathlib import Path
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='AI文档测试系统后端服务')
-    parser.add_argument(
-        '--mode', 
-        choices=['test', 'production'], 
-        default='production',
-        help='运行模式：test（测试模式，使用模拟数据）或 production（生产模式）'
-    )
     parser.add_argument(
         '--config',
         type=str,
@@ -42,8 +36,6 @@ def main():
     
     args = parser.parse_args()
     
-    # 设置环境变量
-    os.environ['APP_MODE'] = args.mode
     
     # 确保在正确的目录
     script_dir = Path(__file__).parent
@@ -54,8 +46,6 @@ def main():
     
     if args.config:
         settings = init_settings(args.config)
-    elif args.mode == 'test':
-        settings = init_settings('config.test.yaml')
     else:
         settings = init_settings('config.yaml')
     
@@ -76,12 +66,8 @@ def main():
     
     # 显示启动信息
     print("="*60)
-    if settings.is_test_mode:
-        print("🧪 启动测试模式")
-        print(f"🤖 AI模式: 模拟数据（不调用真实API）")
-    else:
-        print("🚀 启动生产模式")
-        print(f"🤖 AI模式: 真实API调用")
+    print("🚀 启动服务")
+    print(f"🤖 AI模式: API调用")
     print("="*60)
     print(f"📁 配置文件: {settings.config_file}")
     print(f"📊 数据库: {settings.database_url}")

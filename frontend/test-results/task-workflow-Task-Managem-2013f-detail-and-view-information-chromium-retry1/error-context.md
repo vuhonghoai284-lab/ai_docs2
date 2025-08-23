@@ -1,0 +1,58 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "AI文档测试系统" [level=1] [ref=e6]
+      - menu [ref=e7]:
+        - menuitem "unordered-list 任务列表" [ref=e8] [cursor=pointer]:
+          - img "unordered-list" [ref=e9] [cursor=pointer]:
+            - img [ref=e10] [cursor=pointer]
+          - link "任务列表" [ref=e13] [cursor=pointer]:
+            - /url: /
+        - menuitem "file-add 创建任务" [ref=e14] [cursor=pointer]:
+          - img "file-add" [ref=e15] [cursor=pointer]:
+            - img [ref=e16] [cursor=pointer]
+          - link "创建任务" [ref=e19] [cursor=pointer]:
+            - /url: /create
+        - menuitem [disabled]:
+          - img:
+            - img
+      - generic [ref=e21] [cursor=pointer]:
+        - img [ref=e23] [cursor=pointer]
+        - generic [ref=e24] [cursor=pointer]: 测试用户
+  - main [ref=e25]:
+    - generic [ref=e27]:
+      - generic [ref=e29]:
+        - generic [ref=e30]: 创建文档测试任务
+        - button "返回列表" [ref=e32] [cursor=pointer]:
+          - generic [ref=e33] [cursor=pointer]: 返回列表
+      - generic [ref=e35]:
+        - generic [ref=e37]:
+          - heading "选择分析模型" [level=3] [ref=e38]
+          - generic [ref=e39] [cursor=pointer]:
+            - combobox [ref=e43] [cursor=pointer]
+            - generic:
+              - img:
+                - img
+        - generic [ref=e46]:
+          - heading "上传文档文件" [level=3] [ref=e47]
+          - paragraph [ref=e48]: 支持的文件格式：PDF、Word (.docx)、Markdown (.md)，最大文件大小：10MB
+          - button "inbox 点击或拖拽文件到此区域添加 支持批量选择，选择文件后点击\"创建任务\"按钮开始处理" [ref=e51] [cursor=pointer]:
+            - generic [ref=e52] [cursor=pointer]:
+              - paragraph [ref=e53] [cursor=pointer]:
+                - img "inbox" [ref=e54] [cursor=pointer]:
+                  - img [ref=e55] [cursor=pointer]
+              - paragraph [ref=e57] [cursor=pointer]: 点击或拖拽文件到此区域添加
+              - paragraph [ref=e58] [cursor=pointer]: 支持批量选择，选择文件后点击"创建任务"按钮开始处理
+        - generic [ref=e60]:
+          - heading "已选择的文件" [level=3] [ref=e61]
+          - generic [ref=e63]:
+            - generic [ref=e64]:
+              - generic [ref=e65]:
+                - strong [ref=e66]: sample.md
+                - generic [ref=e67]: (696 Bytes)
+              - generic [ref=e69]: 失败
+            - generic [ref=e70]: 错误：创建任务失败
+```

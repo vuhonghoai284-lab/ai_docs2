@@ -9,45 +9,29 @@ server:
 # 数据库
 database: ./data/app.db
 
-# AI模型配置 - 支持多模型
+# AI模型配置（保持现有结构）
 ai_models:
-  # 默认使用的模型索引（从0开始）
   default_index: 0
-  
-  # 模型列表
   models:
-    - label: "GPT-4o Mini (快速)"  # 前端显示名称
+    - label: "GPT-4o Mini (快速)"
       provider: "openai"
       config:
-        api_key: "${OPENAI_API_KEY}"  # 从环境变量获取
+        api_key: "${OPENAI_API_KEY}"
         base_url: "https://api.openai.com/v1"
         model: "gpt-4o-mini"
         temperature: 0.3
         max_tokens: 8000
-        context_window: 128000  # 模型的上下文窗口大小
-        reserved_tokens: 2000    # 预留给系统提示词的tokens
+        context_window: 128000
+        reserved_tokens: 2000
         timeout: 12000
         max_retries: 3
       description: "适合快速处理，成本较低"
-      
-    - label: "GPT-3.5 Turbo (备用)"  # 前端显示名称
-      provider: "openai"
-      config:
-        api_key: ${OPENAI_API_KEY}
-        base_url: "https://api.openai.com/v1"
-        model: "gpt-3.5-turbo"
-        temperature: 0.5
-        max_tokens: 4096
-        context_window: 16000   # 模型的上下文窗口大小
-        reserved_tokens: 1500    # 预留给系统提示词的tokens
-        timeout: 30
-        max_retries: 2
-      description: "备用模型，成本和性能平衡"
+
 
 # 文件设置  
 file_settings:
   max_file_size: 10485760  # 10MB
-  chunk_size: 8000  # 文本分块大小（废弃，改为从模型配置动态计算）
+  chunk_size: 4000  # 文本分块大小（废弃，改为从模型配置动态计算）
   allowed_extensions:
     - pdf
     - docx
@@ -94,57 +78,35 @@ cors:
   # 开发模式：允许更宽松的CORS策略
   development_mode: "${CORS_DEVELOPMENT_MODE:false}"  # 默认false，可通过环境变量启用
 
-# 测试模式配置
-test_mode: false  # 全局测试模式开关
-
-# 外部API Mock配置（仅在测试模式下生效）
-external_api_mock:
-  # 第三方用户认证API
-  third_party_auth:
-    enabled: true  # 是否mock第三方认证API
-    mock_delay: 0.1  # 模拟API调用延迟（秒）
-  
-  # AI模型API
-  ai_models:
-    enabled: true  # 是否mock AI模型API
-    mock_delay: 0.5  # 模拟AI调用延迟（秒）
-    
-  # 其他外部服务
-  external_services:
-    enabled: true  # 是否mock其他外部服务
-    mock_delay: 0.2  # 模拟调用延迟（秒）
 
 # 第三方登录配置
+# Gitee OAuth真实配置
 third_party_auth:
-  # OAuth2配置
-  client_id: "${THIRD_PARTY_CLIENT_ID}"  # 从环境变量获取
-  client_secret: "${THIRD_PARTY_CLIENT_SECRET}"  # 从环境变量获取
+  # 提供商类型：使用Gitee
+  provider_type: "gitee"
   
-  # 动态重定向URL配置 - 支持前端域名/IP端口配置
-  frontend_domain: "${FRONTEND_DOMAIN}"  # 前端域名，如: http://localhost:5173 或 https://your-domain.com
-  redirect_path: "/callback"  # 回调路径，固定为/callback
+  # 实际的Gitee应用配置
+  client_id: "077b1f29dbb4c4fda233c93ba34676b00421b2b16d11abc36b38f6298e495876"
+  client_secret: "f3d0cfe1a3143a1b99ca58f234920f0ac63645e6272f65c5771a3a4e4f085fa4"
   
-  scope: "base.profile"
+  # 回调配置 - 注意前端端口是3000
+  frontend_domain: "http://localhost:3000"
+  redirect_path: "/third-login/callback"
   
-  # API端点配置
+  # Gitee权限范围
+  scope: "user_info"
+  
+  # Gitee标准API端点（会自动设置，这里列出供参考）
   api_endpoints:
-    authorization_url: "${THIRD_PARTY_AUTH_URL}"  # 授权页面URL
-    token_url: "${THIRD_PARTY_TOKEN_URL}"  # 获取token的API
-    userinfo_url: "${THIRD_PARTY_USERINFO_URL}"  # 获取用户信息的API
+    authorization_url: "https://gitee.com/oauth/authorize"
+    token_url: "https://gitee.com/oauth/token"
+    userinfo_url: "https://gitee.com/api/v5/user"
+  
   
   # 超时和重试配置
   request_timeout: 30  # 请求超时时间（秒）
   max_retries: 3  # 最大重试次数
   
-  # 示例值（用于文档说明）
-  # 实际配置应该通过环境变量设置：
-  # THIRD_PARTY_CLIENT_ID=your_client_id
-  # THIRD_PARTY_CLIENT_SECRET=your_client_secret  
-  # FRONTEND_DOMAIN=http://localhost:5173  # 开发环境
-  # FRONTEND_DOMAIN=https://your-production-domain.com  # 生产环境
-  # THIRD_PARTY_AUTH_URL=https://auth-provider.com/oauth2/authorize
-  # THIRD_PARTY_TOKEN_URL=https://auth-provider.com/oauth2/accesstoken
-  # THIRD_PARTY_USERINFO_URL=https://auth-provider.com/oauth2/userinfo
 
 # JWT配置
 jwt:
@@ -154,13 +116,4 @@ jwt:
   
 # 环境变量映射（可选）
 env_mapping:
-  OPENAI_API_KEY: "OPENAI_API_KEY"
-  ANTHROPIC_API_KEY: "ANTHROPIC_AUTH_TOKEN"
-  ANTHROPIC_BASE_URL: "ANTHROPIC_BASE_URL"
   JWT_SECRET_KEY: "JWT_SECRET_KEY"
-  THIRD_PARTY_CLIENT_ID: "THIRD_PARTY_CLIENT_ID"
-  THIRD_PARTY_CLIENT_SECRET: "THIRD_PARTY_CLIENT_SECRET"
-  THIRD_PARTY_REDIRECT_URL: "THIRD_PARTY_REDIRECT_URL"
-  THIRD_PARTY_AUTH_URL: "THIRD_PARTY_AUTH_URL"
-  THIRD_PARTY_TOKEN_URL: "THIRD_PARTY_TOKEN_URL"
-  THIRD_PARTY_USERINFO_URL: "THIRD_PARTY_USERINFO_URL"

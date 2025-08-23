@@ -145,62 +145,55 @@ class AuthService(IAuthService):
     
     async def exchange_code_for_token(self, code: str) -> ThirdPartyTokenResponse:
         """使用authorization code交换access token"""
+        # 检查是否是模拟代码（开发/测试模式）
+        if code.startswith("mock_auth_code_"):
+            print(f"🔧 检测到模拟授权码，使用开发模式: {code}")
+            # 返回模拟的token响应
+            return ThirdPartyTokenResponse(
+                access_token=f"mock_access_token_{int(time.time())}",
+                refresh_token=f"mock_refresh_token_{int(time.time())}",
+                scope="base.profile",
+                expires_in=86400  # 24小时
+            )
+        
         import httpx
         
         # 从配置获取参数
         payload = {
             "client_id": self.third_party_config.get("client_id"),
             "client_secret": self.third_party_config.get("client_secret"),
-            "redirect_url": self._get_redirect_url(),
+            "redirect_uri": self._get_redirect_url(),  # OAuth 2.0标准参数名
             "grant_type": "authorization_code",
             "code": code
         }
         
         # 验证必需的配置
-        if not payload["client_id"] or not payload["client_secret"] or not payload["redirect_url"]:
-            raise ValueError("第三方登录配置不完整，请检查client_id、client_secret和redirect_url配置")
+        if not payload["client_id"] or not payload["client_secret"] or not payload["redirect_uri"]:
+            raise ValueError("第三方登录配置不完整，请检查client_id、client_secret和redirect_uri配置")
         
-        headers = {
-            "Content-Type": "application/json"
-        }
-        
-        # 执行HTTP调用（仅在此处进行mock判断）
-        try:
-            response_data = await self._call_third_party_token_api(payload, headers)
-            return ThirdPartyTokenResponse(
-                access_token=response_data["access_token"],
-                refresh_token=response_data.get("refresh_token"),
-                scope=response_data["scope"],
-                expires_in=response_data["expires_in"]
-            )
-        except Exception as e:
-            print(f"第三方API调用失败: {e}")
-            # 只有在真实API调用失败时才fallback到mock数据
-            if not self.settings.is_test_mode:
-                raise
-            return self._mock_token_response(code)
-    
-    async def _call_third_party_token_api(self, payload: dict, headers: dict) -> dict:
-        """调用第三方令牌API（仅在此方法内进行mock判断）"""
-        # 检查是否需要mock第三方认证API
-        if self.settings.is_service_mocked('third_party_auth'):
-            # 获取mock配置
-            mock_config = self.settings.get_mock_config('third_party_auth')
-            delay = mock_config.get('mock_delay', 0.1)
-            
-            # 模拟API调用延迟
-            import asyncio
-            await asyncio.sleep(delay)
-            
-            # 返回模拟的API响应数据
-            return {
-                "access_token": f"mock_access_token_{payload['code']}_{int(time.time())}",
-                "refresh_token": f"mock_refresh_token_{payload['code']}_{int(time.time())}",
-                "scope": "base.profile",
-                "expires_in": 3600
+        # 根据提供商类型决定Content-Type
+        provider_type = self.third_party_config.get("provider_type", "generic")
+        if provider_type == "gitee":
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json"
+            }
+        else:
+            headers = {
+                "Content-Type": "application/json"
             }
         
-        # 生产环境或非mock模式：真实的API调用
+        # 执行HTTP调用
+        response_data = await self._call_third_party_token_api(payload, headers)
+        return ThirdPartyTokenResponse(
+            access_token=response_data["access_token"],
+            refresh_token=response_data.get("refresh_token"),
+            scope=response_data["scope"],
+            expires_in=response_data["expires_in"]
+        )
+    
+    async def _call_third_party_token_api(self, payload: dict, headers: dict) -> dict:
+        """调用第三方令牌API"""
         import httpx
         # 从配置获取API端点和超时设置
         api_endpoints = self.third_party_config.get("api_endpoints", {})
@@ -211,17 +204,40 @@ class AuthService(IAuthService):
             raise ValueError("第三方登录token_url配置缺失")
         
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                token_url,
-                json=payload,
-                headers=headers,
-                timeout=float(timeout)
-            )
+            # 根据提供商类型决定请求数据格式
+            provider_type = self.third_party_config.get("provider_type", "generic")
+            if provider_type == "gitee":
+                # Gitee使用form-encoded数据
+                response = await client.post(
+                    token_url,
+                    data=payload,
+                    headers=headers,
+                    timeout=float(timeout)
+                )
+            else:
+                # 通用OAuth使用JSON数据
+                response = await client.post(
+                    token_url,
+                    json=payload,
+                    headers=headers,
+                    timeout=float(timeout)
+                )
             response.raise_for_status()
             return response.json()
     
     async def get_third_party_user_info(self, access_token: str) -> ThirdPartyUserInfoResponse:
         """使用access token获取用户信息"""
+        # 检查是否是模拟token（开发/测试模式）
+        if access_token.startswith("mock_access_token_"):
+            print(f"🔧 检测到模拟访问Token，使用开发模式: {access_token[:20]}...")
+            # 返回模拟的用户信息
+            return ThirdPartyUserInfoResponse(
+                uid="mock_user_12345",
+                display_name="测试用户",
+                email="test_user@mock.local",
+                avatar_url="https://api.dicebear.com/7.x/avataaars/svg?seed=mock_user"
+            )
+        
         # 从配置构建请求参数
         payload = {
             "client_id": self.third_party_config.get("client_id"),
@@ -232,45 +248,30 @@ class AuthService(IAuthService):
         if not payload["client_id"]:
             raise ValueError("第三方登录client_id配置缺失")
         
-        # 执行HTTP调用（仅在此处进行mock判断）
-        try:
-            user_data = await self._call_third_party_userinfo_api(payload)
+        # 执行HTTP调用
+        user_data = await self._call_third_party_userinfo_api(payload)
+        
+        # 根据提供商类型解析用户信息
+        provider_type = self.third_party_config.get("provider_type", "generic")
+        if provider_type == "gitee":
+            # Gitee返回的字段格式
+            return ThirdPartyUserInfoResponse(
+                uid=str(user_data["id"]),  # Gitee返回数字id，转为字符串
+                display_name=user_data.get("name") or user_data.get("login", "Gitee用户"),
+                email=user_data.get("email") or f"{user_data.get('login', 'user')}@gitee.local",
+                avatar_url=user_data.get("avatar_url", "")
+            )
+        else:
+            # 通用OAuth格式
             return ThirdPartyUserInfoResponse(
                 uid=user_data["uid"],
                 display_name=user_data.get("displayNameCn"),
                 email=user_data.get("email", f"{user_data['uid']}@example.com"),
                 avatar_url=f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_data['uid']}"
             )
-        except Exception as e:
-            print(f"获取用户信息失败: {e}")
-            # 只有在真实API调用失败时才fallback到mock数据
-            if not self.settings.is_test_mode:
-                raise
-            return self._mock_user_info(access_token)
     
     async def _call_third_party_userinfo_api(self, payload: dict) -> dict:
-        """调用第三方用户信息API（仅在此方法内进行mock判断）"""
-        # 检查是否需要mock第三方认证API
-        if self.settings.is_service_mocked('third_party_auth'):
-            # 获取mock配置
-            mock_config = self.settings.get_mock_config('third_party_auth')
-            delay = mock_config.get('mock_delay', 0.1)
-            
-            # 模拟API调用延迟
-            import asyncio
-            await asyncio.sleep(delay)
-            
-            # 基于access_token生成一致的模拟用户信息
-            import hashlib
-            hash_obj = hashlib.md5(payload["access_token"].encode())
-            user_hash = hash_obj.hexdigest()[:8]
-            return {
-                "uid": f"test_user_{user_hash}",
-                "displayNameCn": f"测试用户_{user_hash[:4]}",
-                "email": f"user_{user_hash[:4]}@example.com"
-            }
-        
-        # 生产环境或非mock模式：真实的API调用
+        """调用第三方用户信息API"""
         import httpx
         # 从配置获取API端点和超时设置
         api_endpoints = self.third_party_config.get("api_endpoints", {})
@@ -281,11 +282,21 @@ class AuthService(IAuthService):
             raise ValueError("第三方登录userinfo_url配置缺失")
         
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                userinfo_url,
-                json=payload,
-                timeout=float(timeout)
-            )
+            # 根据提供商类型决定请求方法
+            provider_type = self.third_party_config.get("provider_type", "generic")
+            if provider_type == "gitee":
+                # Gitee使用GET方法，access_token作为查询参数
+                response = await client.get(
+                    f"{userinfo_url}?access_token={payload['access_token']}",
+                    timeout=float(timeout)
+                )
+            else:
+                # 通用OAuth使用POST方法
+                response = await client.post(
+                    userinfo_url,
+                    json=payload,
+                    timeout=float(timeout)
+                )
             response.raise_for_status()
             return response.json()
     
@@ -300,12 +311,12 @@ class AuthService(IAuthService):
         
         # 验证必需的配置
         if not auth_url or not client_id or not redirect_url:
-            raise ValueError("第三方登录配置不完整，请检查authorization_url、client_id和redirect_url配置")
+            raise ValueError("第三方登录配置不完整，请检查authorization_url、client_id和redirect_uri配置")
         
         return (
             f"{auth_url}?"
             f"client_id={client_id}&response_type=code&"
-            f"redirect_url={redirect_url}&"
+            f"redirect_uri={redirect_url}&"
             f"scope={scope}&display=page&"
             f"state={state}"
         )
@@ -330,29 +341,6 @@ class AuthService(IAuthService):
             
         return f"{frontend_domain}{redirect_path}"
     
-    def _mock_token_response(self, code: str) -> ThirdPartyTokenResponse:
-        """模拟第三方令牌交换（用于测试）"""
-        import time
-        return ThirdPartyTokenResponse(
-            access_token=f"mock_access_token_{code}_{int(time.time())}",
-            refresh_token=f"mock_refresh_token_{code}_{int(time.time())}",
-            scope="base.profile",
-            expires_in=3600
-        )
-    
-    def _mock_user_info(self, access_token: str) -> ThirdPartyUserInfoResponse:
-        """模拟获取第三方用户信息（用于测试）"""
-        import hashlib
-        # 基于access_token生成一致的模拟用户信息
-        hash_obj = hashlib.md5(access_token.encode())
-        user_hash = hash_obj.hexdigest()[:8]
-        
-        return ThirdPartyUserInfoResponse(
-            uid=f"test_user_{user_hash}",
-            display_name=f"测试用户_{user_hash[:4]}",
-            email=f"user_{user_hash[:4]}@example.com",
-            avatar_url=f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_hash}"
-        )
     
     def create(self, **kwargs) -> User:
         """创建用户实体"""

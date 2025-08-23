@@ -50,6 +50,16 @@ class ThirdPartyAuthRequest(BaseModel):
     code: str
 
 
+class ThirdPartyTokenExchangeRequest(BaseModel):
+    """第三方令牌兑换请求模型"""
+    code: str
+
+
+class ThirdPartyLoginRequest(BaseModel):
+    """第三方登录请求模型"""
+    access_token: str
+
+
 class ThirdPartyTokenResponse(BaseModel):
     """第三方令牌响应模型"""
     access_token: str

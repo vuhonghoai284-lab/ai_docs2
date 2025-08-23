@@ -1,11 +1,10 @@
 """
-AI服务工厂 - 根据配置返回真实或模拟的AI服务
+AI服务工厂 - 创建AI服务实例
 """
 import logging
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 
-from app.services.mock_ai_service import MockAIService
 from app.services.document_processor import DocumentProcessor
 from app.services.issue_detector import IssueDetector
 from app.services.realtime_logger import realtime_logger, TaskLoggerAdapter
@@ -26,13 +25,12 @@ class AIServiceFactory:
             console_handler.setFormatter(formatter)
             self.logger.addHandler(console_handler)
     
-    def create_service(self, model_config: Dict[str, Any], test_mode: bool = False, db_session: Optional[Session] = None):
+    def create_service(self, model_config: Dict[str, Any], db_session: Optional[Session] = None):
         """
         创建AI服务实例
         
         Args:
             model_config: 模型配置
-            test_mode: 是否为测试模式
             db_session: 数据库会话
             
         Returns:
@@ -40,36 +38,20 @@ class AIServiceFactory:
         """
         provider = model_config.get('provider', 'openai')
         
-        self.logger.info(f"🏭 创建AI服务: provider={provider}, test_mode={test_mode}")
+        self.logger.info(f"🏭 创建AI服务: provider={provider}")
         
-        # 如果是测试模式或使用mock provider，返回模拟服务
-        if test_mode or provider == 'mock':
-            self.logger.info("🔧 使用模拟AI服务")
-            return {
-                'mock_service': MockAIService(model_config.get('config', {})),
-                'document_processor': None,
-                'issue_detector': None
-            }
-        
-        # 否则返回真实的AI服务组件
         try:
             document_processor = DocumentProcessor(model_config, db_session)
             issue_detector = IssueDetector(model_config, db_session)
             
-            self.logger.info("✅ 真实AI服务创建成功")
+            self.logger.info("✅ AI服务创建成功")
             return {
-                'mock_service': None,
                 'document_processor': document_processor,
                 'issue_detector': issue_detector
             }
         except Exception as e:
-            self.logger.error(f"❌ 创建真实AI服务失败: {str(e)}")
-            self.logger.warning("🔄 降级到模拟服务")
-            return {
-                'mock_service': MockAIService(model_config.get('config', {})),
-                'document_processor': None,
-                'issue_detector': None
-            }
+            self.logger.error(f"❌ 创建AI服务失败: {str(e)}")
+            raise e
     
     def get_service_for_model(self, ai_model_index: int, settings, db_session: Optional[Session] = None):
         """
@@ -91,7 +73,7 @@ class AIServiceFactory:
         model_config = models[ai_model_index]
         self.logger.info(f"🎯 选择模型: {model_config.get('label', 'Unknown')} (索引: {ai_model_index})")
         
-        return self.create_service(model_config, settings.is_test_mode, db_session)
+        return self.create_service(model_config, db_session)
     
     def create_task_logger(self, task_id: int, operation: str = "") -> TaskLoggerAdapter:
         """

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import { Layout, Menu, Dropdown, Avatar, message } from 'antd';
 import { FileAddOutlined, UnorderedListOutlined, UserOutlined, BarChartOutlined } from '@ant-design/icons';
+import { flushSync } from 'react-dom';
 import TaskCreate from './pages/TaskCreate';
 import TaskList from './pages/TaskList';
 import TaskDetailEnhanced from './pages/TaskDetailEnhanced';
@@ -16,10 +17,25 @@ import './App.css';
 
 const { Header, Content } = Layout;
 
-// 认证保护组件
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// 认证保护组件 - 修复时序问题版本
+const ProtectedRoute: React.FC<{ children: React.ReactNode; user: User | null }> = ({ children, user }) => {
   const token = localStorage.getItem('token');
-  return token ? <>{children}</> : <Navigate to="/login" replace />;
+  const userString = localStorage.getItem('user');
+  
+  // 修复时序问题：优先使用React状态中的用户信息，其次使用localStorage
+  const isAuthenticated = token && (user || userString);
+  
+  if (!isAuthenticated) {
+    console.log('🔒 ProtectedRoute: 用户未认证，重定向到登录页面');
+    console.log('   Token存在:', !!token);
+    console.log('   React用户状态:', !!user);
+    console.log('   localStorage用户:', !!userString);
+    return <Navigate to="/login" replace />;
+  }
+  
+  console.log('✅ ProtectedRoute: 用户已认证，允许访问');
+  console.log('   使用的用户信息来源:', user ? 'React状态' : 'localStorage');
+  return <>{children}</>;
 };
 
 // 管理员权限保护组件
@@ -153,6 +169,39 @@ const AppContent: React.FC = () => {
     initUser();
   }, []);
 
+  // 监听登录事件（来自LoginPage和CallbackHandler的自定义事件）
+  const handleUserLoginEvent = useCallback((event: CustomEvent) => {
+    const { user: loggedInUser, token } = event.detail;
+    console.log('🚀 收到登录事件，立即更新用户状态:', loggedInUser.display_name);
+    
+    // 确保localStorage中的数据是最新的
+    localStorage.setItem('user', JSON.stringify(loggedInUser));
+    localStorage.setItem('token', token);
+    
+    // 使用flushSync强制同步更新React状态，避免异步延迟
+    console.log('⚡ 使用flushSync强制同步状态更新...');
+    flushSync(() => {
+      setUser(loggedInUser);
+    });
+    
+    console.log('✅ 用户状态同步更新完成，应用现在显示为已登录状态');
+    console.log('   📊 当前状态:', {
+      reactUser: loggedInUser.display_name,
+      localStorage: !!localStorage.getItem('user'),
+      token: !!localStorage.getItem('token')
+    });
+    
+    // 状态已同步更新，立即发送确认信号
+    console.log('📤 立即发送状态更新确认事件...');
+    window.dispatchEvent(new CustomEvent('userStateUpdated', {
+      detail: { 
+        success: true, 
+        user: loggedInUser,
+        timestamp: Date.now()
+      }
+    }));
+  }, []);
+
   // 监听storage变化，当登录状态改变时更新用户信息
   useEffect(() => {
     const handleStorageChange = async () => {
@@ -171,31 +220,62 @@ const AppContent: React.FC = () => {
 
     window.addEventListener('storage', handleStorageChange);
     
-    // 手动检查token变化（用于同一页面内的登录）
-    const checkTokenInterval = setInterval(async () => {
+    window.addEventListener('userLogin', handleUserLoginEvent as EventListener);
+    
+    // 手动检查token变化的函数（增强版）
+    const checkTokenAndUser = async () => {
       const token = localStorage.getItem('token');
       const userString = localStorage.getItem('user');
       
-      if (token && userString && !user) {
-        try {
-          const storedUser = JSON.parse(userString);
-          setUser(storedUser);
-        } catch (error) {
+      // 优化检查逻辑，提供更详细的日志
+      if (token && userString) {
+        // 如果有token和用户数据
+        if (!user) {
+          // 但当前用户状态为空，需要更新
           try {
-            const currentUser = await getCurrentUser();
-            setUser(currentUser);
-          } catch (e) {
-            console.error('获取用户信息失败', e);
+            const storedUser = JSON.parse(userString);
+            console.log('🔄 检测到用户登录状态，立即更新应用状态:', storedUser.display_name);
+            setUser(storedUser);
+          } catch (error) {
+            console.warn('解析localStorage中的用户数据失败:', error);
+            try {
+              // 尝试从API获取用户信息
+              const currentUser = await getCurrentUser();
+              if (currentUser) {
+                console.log('🔄 从API获取用户信息成功:', currentUser.display_name);
+                setUser(currentUser);
+              }
+            } catch (e) {
+              console.error('获取用户信息失败:', e);
+              // 获取失败时清除可能无效的token
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+            }
           }
         }
+      } else if (!token && user) {
+        // 没有token但用户状态存在，需要登出
+        console.log('🔄 检测到用户登出，清除应用状态');
+        setUser(null);
+      } else if (token && !userString) {
+        // 有token但没有用户数据，可能是数据不完整
+        console.warn('⚠️ 检测到不完整的登录状态（有token但无用户数据），清除状态');
+        localStorage.removeItem('token');
       }
-    }, 1000);
+    };
+
+    // 立即执行一次检查
+    checkTokenAndUser();
+
+    // 定期检查token变化（用于同一页面内的登录，频率提高）
+    const checkTokenInterval = setInterval(checkTokenAndUser, 100);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('userLogin', handleUserLoginEvent as EventListener);
       clearInterval(checkTokenInterval);
     };
-  }, [user]);
+  }, []); // 移除user依赖，避免重复注册事件监听器
 
   const handleLogout = () => {
     logout();
@@ -210,7 +290,7 @@ const AppContent: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/callback" element={<CallbackHandler />} />
+      <Route path="/third-login/callback" element={<CallbackHandler />} />
       <Route path="/*" element={
         <Layout style={{ minHeight: '100vh' }}>
           <ThemedHeader user={user} onLogout={handleLogout} />
@@ -219,7 +299,7 @@ const AppContent: React.FC = () => {
               <Route 
                 path="/" 
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute user={user}>
                     <TaskList />
                   </ProtectedRoute>
                 } 
@@ -227,7 +307,7 @@ const AppContent: React.FC = () => {
               <Route 
                 path="/create" 
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute user={user}>
                     <TaskCreate />
                   </ProtectedRoute>
                 } 
@@ -235,7 +315,7 @@ const AppContent: React.FC = () => {
               <Route 
                 path="/task/:id" 
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute user={user}>
                     <TaskDetailEnhanced />
                   </ProtectedRoute>
                 } 

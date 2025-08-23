@@ -9,9 +9,18 @@ from sqlalchemy.pool import StaticPool
 import sys
 import os
 import tempfile
+from unittest.mock import patch, AsyncMock
 
 # 设置测试环境变量（必须在导入应用之前）
 os.environ['APP_MODE'] = 'test'
+
+# 设置第三方认证的mock配置
+os.environ['FRONTEND_DOMAIN'] = 'http://localhost:3000'
+os.environ['THIRD_PARTY_CLIENT_ID'] = 'test_client_id'
+os.environ['THIRD_PARTY_CLIENT_SECRET'] = 'test_client_secret'
+os.environ['THIRD_PARTY_AUTH_URL'] = 'https://test-auth.example.com/oauth2/authorize'
+os.environ['THIRD_PARTY_TOKEN_URL'] = 'https://test-auth.example.com/oauth2/accesstoken'
+os.environ['THIRD_PARTY_USERINFO_URL'] = 'https://test-auth.example.com/oauth2/userinfo'
 
 # 添加父目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -230,3 +239,91 @@ def temp_upload_dir():
     """创建临时上传目录"""
     with tempfile.TemporaryDirectory() as temp_dir:
         yield temp_dir
+
+
+@pytest.fixture(autouse=True)
+def mock_third_party_auth():
+    """Mock第三方认证HTTP请求"""
+    
+    async def mock_token_request(*args, **kwargs):
+        """Mock token获取请求"""
+        class MockResponse:
+            def json(self):
+                return {
+                    "access_token": "mock_access_token_12345",
+                    "refresh_token": "mock_refresh_token_67890", 
+                    "scope": "base.profile",
+                    "expires_in": 3600
+                }
+            
+            def raise_for_status(self):
+                pass
+        
+        return MockResponse()
+    
+    async def mock_userinfo_request(*args, **kwargs):
+        """Mock用户信息获取请求"""
+        # 从请求中获取auth code来生成不同的用户信息
+        request_url = args[0] if args else kwargs.get('url', '')
+        request_json = kwargs.get('json', {})
+        request_data = kwargs.get('data', {})
+        
+        # 获取auth code
+        auth_code = request_data.get('code') or request_json.get('code')
+        
+        class MockResponse:
+            def json(self):
+                # 根据auth code生成不同的用户信息
+                if auth_code == "user_a_auth_code":
+                    return {
+                        "uid": "test_user_a",
+                        "displayNameCn": "测试用户A",
+                        "email": "user_a@test.com"
+                    }
+                elif auth_code == "user_c_auth_code":
+                    return {
+                        "uid": "test_user_c", 
+                        "displayNameCn": "测试用户C",
+                        "email": "user_c@test.com"
+                    }
+                else:
+                    # 默认测试用户
+                    return {
+                        "uid": "test_third_party_user",
+                        "displayNameCn": "第三方测试用户",
+                        "email": "third_party@test.com"
+                    }
+            
+            def raise_for_status(self):
+                pass
+        
+        return MockResponse()
+    
+    # Mock httpx.AsyncClient的post和get方法
+    with patch('httpx.AsyncClient') as mock_client:
+        mock_instance = AsyncMock()
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_instance)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+        
+        # 根据请求URL决定返回哪个mock响应
+        async def mock_request_handler(method, url_or_first_arg, **kwargs):
+            if method == 'POST':
+                url = url_or_first_arg
+                if 'accesstoken' in url or 'token' in url:
+                    return await mock_token_request(url, **kwargs)
+                else:
+                    return await mock_userinfo_request(url, **kwargs)
+            elif method == 'GET':
+                url = url_or_first_arg
+                return await mock_userinfo_request(url, **kwargs)
+        
+        async def post_handler(*args, **kwargs):
+            return await mock_request_handler('POST', *args, **kwargs)
+        
+        async def get_handler(*args, **kwargs):  
+            return await mock_request_handler('GET', *args, **kwargs)
+        
+        mock_instance.post = post_handler
+        mock_instance.get = get_handler
+        
+        yield mock_client
