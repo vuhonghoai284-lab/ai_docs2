@@ -153,6 +153,16 @@ class LogService {
         }
         break;
       
+      case 'progress':
+        // 进度更新消息，仅触发进度事件，不作为日志显示
+        this.emit('progress', {
+          taskId: task_id,
+          progress: data.progress,
+          stage: data.stage
+        });
+        break;
+      
+      case 'log':
       default:
         // 普通日志消息
         this.addLog(task_id, data);

@@ -55,13 +55,17 @@ class ConnectionManager:
     async def send_log(self, task_id: int, level: str, message: str, 
                       stage: str = None, progress: int = None, module: str = "system"):
         """发送日志消息"""
+        # 过滤空消息，避免产生空行
+        if not message or not str(message).strip():
+            return
+            
         log_data = {
             "type": "log",
             "timestamp": datetime.now().isoformat(),
             "level": level,
             "module": module,
             "stage": stage,
-            "message": message,
+            "message": str(message).strip(),
             "progress": progress
         }
         await self.broadcast_to_task(task_id, log_data)

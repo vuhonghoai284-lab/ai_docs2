@@ -15,6 +15,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { taskAPI } from '../api';
 import { TaskDetail as TaskDetailType, Issue, AIOutput } from '../types';
 import TaskLogs from '../components/TaskLogs';
+import { formatInputText, formatJSON, decodeUnicode, isLikelyJSON } from '../utils/textFormatter';
 import './TaskDetailEnhanced.css';
 
 const { Text, Paragraph, Title } = Typography;
@@ -261,7 +262,7 @@ const TaskDetailEnhanced: React.FC = () => {
             </Col>
             <Col span={4}>
               <Text type="secondary">文件类型</Text>
-              <div><Tag>{task.file_type.toUpperCase()}</Tag></div>
+              <div><Tag>{task.file_type?.toUpperCase() || 'UNKNOWN'}</Tag></div>
             </Col>
           </Row>
         </Card>
@@ -391,11 +392,21 @@ const TaskDetailEnhanced: React.FC = () => {
                           className={`issue-card issue-severity-${issue.severity.toLowerCase()}`}
                           size="small"
                         >
-                          {/* 问题标题栏 - 新布局 */}
-                          <div className="issue-header-new">
-                            <div className="issue-title">
-                              <span className="issue-number">#{startIndex + paginatedIssues.indexOf(issue) + 1}</span>
-                              <Text className="issue-desc">{issue.description}</Text>
+                          {/* 第一行：问题编号 + 级别 + 错误类型 + 问题描述 + 状态 */}
+                          <div className="issue-header-compact">
+                            <div className="issue-main-info">
+                              <Space size={12} align="center">
+                                <span className="issue-number">#{startIndex + paginatedIssues.indexOf(issue) + 1}</span>
+                                {getSeverityBadge(issue.severity, false)}
+                                <Tag color="blue" className="issue-type-tag">[{issue.issue_type}]</Tag>
+                                <Text 
+                                  className="issue-description" 
+                                  ellipsis={{ tooltip: decodeUnicode(issue.description) }}
+                                  style={{ fontWeight: '500', color: '#262626', flex: 1 }}
+                                >
+                                  {decodeUnicode(issue.description)}
+                                </Text>
+                              </Space>
                             </div>
                             <Space className="issue-tags" size={6}>
                               {getSeverityBadge(issue.severity)}
@@ -411,84 +422,31 @@ const TaskDetailEnhanced: React.FC = () => {
                             </Space>
                           </div>
 
-                          {/* 对比展示区 - 原文 vs 改进建议 */}
-                          <div className="issue-comparison">
-                            <Row gutter={16}>
-                              <Col span={12}>
-                                <div className="comparison-section original">
-                                  <div className="comparison-header">
-                                    <FileTextOutlined style={{ color: '#ff4d4f' }} />
-                                    <Text strong> 原文内容</Text>
-                                  </div>
-                                  <div className="comparison-content">
-                                    {issue.original_text || '未提供原文'}
-                                  </div>
-                                </div>
-                              </Col>
-                              <Col span={12}>
-                                <div className="comparison-section suggestion">
-                                  <div className="comparison-header">
-                                    <EditOutlined style={{ color: '#52c41a' }} />
-                                    <Text strong> 改进建议</Text>
-                                  </div>
-                                  <div className="comparison-content">
-                                    {issue.suggestion || '未提供建议'}
-                                  </div>
-                                </div>
-                              </Col>
-                            </Row>
-                          </div>
+                          {/* 第二行：原文内容（单行显示） */}
+                          {issue.original_text && (
+                            <div className="issue-content-row">
+                              <div className="content-section original">
+                                <Text style={{ fontSize: 13, lineHeight: 1.5, color: '#595959' }}>
+                                  <FileTextOutlined style={{ color: '#ff7875', marginRight: 6 }} />
+                                  <Text strong style={{ color: '#ff7875', marginRight: 8 }}>原文内容：</Text>
+                                  {decodeUnicode(issue.original_text)}
+                                </Text>
+                              </div>
+                            </div>
+                          )}
 
-                          {/* 更多信息 - 默认折叠 */}
-                          {(issue.location || issue.reasoning || issue.user_impact || issue.context) && (
-                              <Collapse 
-                                ghost 
-                                className="more-info-collapse"
-                                activeKey={expandedSections[issue.id]?.has('moreInfo') ? ['moreInfo'] : []}
-                                onChange={() => toggleSection(issue.id, 'moreInfo')}
-                              >
-                                <Panel
-                                  header={
-                                    <Space size={4}>
-                                      <InfoCircleOutlined style={{ color: '#1890ff' }} />
-                                      <Text>更多信息</Text>
-                                    </Space>
-                                  }
-                                  key="moreInfo"
-                                >
-                                  <div className="more-info-content">
-                                    {issue.location && (
-                                      <div className="info-item">
-                                        <EnvironmentOutlined style={{ color: '#8c8c8c' }} />
-                                        <Text strong> 章节位置：</Text>
-                                        <Text>{issue.location}</Text>
-                                      </div>
-                                    )}
-                                    {issue.reasoning && (
-                                      <div className="info-item">
-                                        <ThunderboltOutlined style={{ color: '#1890ff' }} />
-                                        <Text strong> 判定原因：</Text>
-                                        <Text>{issue.reasoning}</Text>
-                                      </div>
-                                    )}
-                                    {issue.user_impact && (
-                                      <div className="info-item">
-                                        <UserOutlined style={{ color: '#faad14' }} />
-                                        <Text strong> 用户影响：</Text>
-                                        <Text>{issue.user_impact}</Text>
-                                      </div>
-                                    )}
-                                    {issue.context && (
-                                      <div className="info-item">
-                                        <FileTextOutlined style={{ color: '#722ed1' }} />
-                                        <Text strong> 上下文环境：</Text>
-                                        <Text>{issue.context}</Text>
-                                      </div>
-                                    )}
-                                  </div>
-                                </Panel>
-                              </Collapse>
-                            )}
+                          {/* 第三行：改进建议（单行显示） */}
+                          {issue.suggestion && (
+                            <div className="issue-content-row">
+                              <div className="content-section suggestion">
+                                <Text style={{ fontSize: 13, lineHeight: 1.5, color: '#595959' }}>
+                                  <EditOutlined style={{ color: '#73d13d', marginRight: 6 }} />
+                                  <Text strong style={{ color: '#73d13d', marginRight: 8 }}>改进建议：</Text>
+                                  {decodeUnicode(issue.suggestion)}
+                                </Text>
+                              </div>
+                            </div>
+                          )}
 
                             {/* 用户反馈区（紧凑布局） */}
                             <div className="feedback-section-compact">
@@ -553,15 +511,149 @@ const TaskDetailEnhanced: React.FC = () => {
                                       }
                                     }}
                                   />
-                                  <div className="comment-actions">
-                                    <Space size={4}>
-                                      <Button 
-                                        size="small" 
-                                        type="primary"
-                                        onClick={() => {
-                                          if (issue.feedback_type) {
-                                            handleFeedback(issue.id, issue.feedback_type, issue.feedback_comment);
-                                            toggleComment(issue.id);
+                                  {issue.satisfaction_rating && (
+                                    <Text style={{ fontSize: 11, color: '#8c8c8c' }}>
+                                      {issue.satisfaction_rating}星
+                                    </Text>
+                                  )}
+                                </Space>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 详情信息 - 默认折叠 */}
+                          <div className="details-section">
+                            <Collapse 
+                              ghost 
+                              className="details-collapse"
+                              activeKey={expandedSections[issue.id]?.has('details') ? ['details'] : []}
+                              onChange={() => toggleSection(issue.id, 'details')}
+                            >
+                              <Panel
+                                header={
+                                  <Space size={4}>
+                                    <InfoCircleOutlined style={{ color: '#1890ff' }} />
+                                    <Text>详细信息</Text>
+                                  </Space>
+                                }
+                                key="details"
+                              >
+                                {/* 原文对比展示 */}
+                                {(issue.original_text || issue.suggestion) && (
+                                  <div className="comparison-section">
+                                    <Row gutter={16}>
+                                      <Col span={12}>
+                                        <div className="comparison-box">
+                                          <div className="comparison-header">
+                                            <FileTextOutlined style={{ color: '#ff4d4f' }} />
+                                            <Text strong> 原文内容</Text>
+                                          </div>
+                                          <div className="comparison-content">
+                                            {issue.original_text ? decodeUnicode(issue.original_text) : '未提供原文'}
+                                          </div>
+                                        </div>
+                                      </Col>
+                                      <Col span={12}>
+                                        <div className="comparison-box">
+                                          <div className="comparison-header">
+                                            <EditOutlined style={{ color: '#52c41a' }} />
+                                            <Text strong> 改进建议</Text>
+                                          </div>
+                                          <div className="comparison-content">
+                                            {issue.suggestion ? decodeUnicode(issue.suggestion) : '未提供建议'}
+                                          </div>
+                                        </div>
+                                      </Col>
+                                    </Row>
+                                  </div>
+                                )}
+
+                                {/* 详细分析 */}
+                                <div className="more-info-content">
+                                  {issue.location && (
+                                    <div className="info-item">
+                                      <EnvironmentOutlined style={{ color: '#8c8c8c' }} />
+                                      <Text strong> 章节位置：</Text>
+                                      <Text>{issue.location}</Text>
+                                    </div>
+                                  )}
+                                  {issue.reasoning && (
+                                    <div className="info-item">
+                                      <ThunderboltOutlined style={{ color: '#1890ff' }} />
+                                      <Text strong> 判定原因：</Text>
+                                      <Text>{decodeUnicode(issue.reasoning)}</Text>
+                                    </div>
+                                  )}
+                                  {issue.user_impact && (
+                                    <div className="info-item">
+                                      <UserOutlined style={{ color: '#faad14' }} />
+                                      <Text strong> 用户影响：</Text>
+                                      <Text>{decodeUnicode(issue.user_impact)}</Text>
+                                    </div>
+                                  )}
+                                  {issue.context && (
+                                    <div className="info-item">
+                                      <FileTextOutlined style={{ color: '#722ed1' }} />
+                                      <Text strong> 上下文环境：</Text>
+                                      <Text>{decodeUnicode(issue.context)}</Text>
+                                    </div>
+                                  )}
+                                </div>
+                              </Panel>
+                            </Collapse>
+                          </div>
+
+                          {/* 评论输入区（可展开） */}
+                          {expandedComments.has(issue.id) && (
+                            <div className="comment-section">
+                              <div className="comment-input-area">
+                                <div className="comment-header">
+                                  <UserOutlined style={{ color: '#1890ff' }} />
+                                  <Text strong> 添加评论</Text>
+                                </div>
+                                <TextArea
+                                  placeholder="请输入反馈意见..."
+                                  rows={3}
+                                  value={issue.feedback_comment || ''}
+                                  onChange={(e) => {
+                                    const newIssues = [...issues];
+                                    const idx = newIssues.findIndex(i => i.id === issue.id);
+                                    if (idx >= 0) {
+                                      newIssues[idx].feedback_comment = e.target.value;
+                                      setTaskDetail({ ...taskDetail, issues: newIssues });
+                                    }
+                                  }}
+                                  className="comment-textarea"
+                                />
+                                <div className="comment-actions">
+                                  <Space size={8}>
+                                    <Dropdown
+                                      trigger={['click']}
+                                      menu={{
+                                        items: [
+                                          { key: '1', label: '同意此建议' },
+                                          { key: '2', label: '不适用于当前文档' },
+                                          { key: '3', label: '需要进一步确认' },
+                                          { key: '4', label: '误报' },
+                                          { key: '5', label: '自定义输入...' },
+                                        ],
+                                        onClick: ({ key }) => {
+                                          const templates = [
+                                            '同意此建议',
+                                            '不适用于当前文档',
+                                            '需要进一步确认',
+                                            '误报',
+                                            ''
+                                          ];
+                                          const template = templates[parseInt(key) - 1] || '';
+                                          
+                                          if (template) {
+                                            const newIssues = [...issues];
+                                            const idx = newIssues.findIndex(i => i.id === issue.id);
+                                            if (idx >= 0) {
+                                              newIssues[idx].feedback_comment = template;
+                                              setTaskDetail({ ...taskDetail, issues: newIssues });
+                                            }
                                           }
                                         }}
                                       >
@@ -694,9 +786,10 @@ const TaskDetailEnhanced: React.FC = () => {
                           overflow: 'auto',
                           whiteSpace: 'pre-wrap',
                           fontFamily: 'monospace',
-                          fontSize: 12
+                          fontSize: 12,
+                          lineHeight: '1.6'
                         }}>
-                          {output.input_text}
+                          {formatInputText(output.input_text)}
                         </div>
                       </Panel>
 
@@ -718,9 +811,13 @@ const TaskDetailEnhanced: React.FC = () => {
                           overflow: 'auto',
                           whiteSpace: 'pre-wrap',
                           fontFamily: 'monospace',
-                          fontSize: 12
+                          fontSize: 12,
+                          lineHeight: '1.6'
                         }}>
-                          {output.raw_output}
+                          {isLikelyJSON(output.raw_output) 
+                            ? formatJSON(output.raw_output)
+                            : decodeUnicode(output.raw_output)
+                          }
                         </div>
                       </Panel>
 
@@ -745,9 +842,10 @@ const TaskDetailEnhanced: React.FC = () => {
                             <pre style={{ 
                               margin: 0,
                               fontFamily: 'monospace',
-                              fontSize: 12
+                              fontSize: 12,
+                              lineHeight: '1.6'
                             }}>
-                              {JSON.stringify(output.parsed_output, null, 2)}
+                              {decodeUnicode(JSON.stringify(output.parsed_output, null, 2))}
                             </pre>
                           </div>
                         </Panel>
@@ -765,7 +863,7 @@ const TaskDetailEnhanced: React.FC = () => {
                           key="error"
                         >
                           <Alert 
-                            message={output.error_message} 
+                            message={decodeUnicode(output.error_message)} 
                             type="error" 
                             showIcon 
                           />

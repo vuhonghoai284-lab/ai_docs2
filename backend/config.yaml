@@ -6,8 +6,30 @@ server:
   reload: false  # 自动重载
   workers: 1  # 工作进程数
 
-# 数据库
-database: ./data/app.db
+# 数据库配置
+database:
+  # 数据库类型: sqlite 或 mysql
+  type: "sqlite"
+  
+  # SQLite配置（默认）
+  sqlite:
+    path: "./data/app.db"
+  
+  # MySQL配置（可选）
+  mysql:
+    host: "${MYSQL_HOST:localhost}"
+    port: "${MYSQL_PORT:3306}"
+    username: "${MYSQL_USERNAME:root}"
+    password: "${MYSQL_PASSWORD}"
+    database: "${MYSQL_DATABASE:ai_doc_test}"
+    charset: "utf8mb4"
+    # 连接池配置
+    pool:
+      pool_size: 5
+      max_overflow: 10
+      pool_timeout: 30
+      pool_recycle: 3600
+      pool_pre_ping: true
 
 # AI模型配置 - 支持多模型
 ai_models:
@@ -74,6 +96,13 @@ task_processing:
   max_concurrent_tasks: 3  # 最大并发任务数
   task_timeout: 12000  # 任务超时时间（秒）
   retry_failed_tasks: true  # 是否重试失败的任务
+  
+  # 章节合并配置
+  section_merge:
+    enabled: true  # 是否启用章节合并
+    max_chars: 5000  # 合并后章节最大字符数
+    min_chars: 100  # 最小章节字符数（短于此数值的章节总是被合并）
+    preserve_structure: true  # 是否保持章节层级结构
   
 # CORS配置
 cors:

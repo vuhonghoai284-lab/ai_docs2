@@ -3,8 +3,8 @@ export interface Task {
   id: number;
   title: string;
   file_name: string;
-  file_size: number;
-  file_type: string;
+  file_size?: number;
+  file_type?: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
   issue_count?: number;  // 新增：问题数量
@@ -14,6 +14,12 @@ export interface Task {
   created_at: string;
   completed_at?: string;
   error_message?: string;
+  created_by?: string; // 新增：创建人ID
+  created_by_name?: string; // 新增：创建人名称
+  created_by_type?: string; // 新增：创建人类型
+  user_id?: number; // 新增：用户ID
+  file_id?: number; // 新增：文件ID
+  ai_model_id?: number; // 新增：AI模型ID
 }
 
 export interface Issue {

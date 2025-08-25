@@ -25,13 +25,45 @@ settings = get_settings()
 # 创建数据库表
 Base.metadata.create_all(bind=engine)
 
-# 创建FastAPI应用
-app = FastAPI(
-    title="AI文档测试系统API",
-    description="基于AI的文档质量检测系统后端API",
-    version="2.0.0",
-    debug=settings.server_config.get('debug', False)
-)
+def create_app() -> FastAPI:
+    """创建并配置FastAPI应用"""
+    app = FastAPI(
+        title="AI文档测试系统API",
+        description="基于AI的文档质量检测系统后端API",
+        version="2.0.0",
+        debug=settings.server_config.get('debug', False),
+        redirect_slashes=False  # 禁用自动斜杠重定向
+    )
+    
+    # 配置CORS
+    cors_origins = settings.cors_origins
+    
+    # 开发模式或端口不是8080时，允许更宽松的CORS
+    server_port = settings.server_config.get('port', 8080)
+    if server_port != 8080 or settings.server_config.get('debug', False):
+        print(f"💡 检测到非标准端口({server_port})或调试模式，启用宽松CORS策略")
+        # 添加当前服务器端口的前端地址
+        additional_origins = [
+            f"http://localhost:3000",
+            f"http://localhost:5173", 
+            f"http://127.0.0.1:3000",
+            f"http://127.0.0.1:5173"
+        ]
+        for origin in additional_origins:
+            if origin not in cors_origins:
+                cors_origins.append(origin)
+    
+    print(f"🌐 CORS允许的源: {cors_origins}")
+    
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
+    return app
 
 # 配置CORS
 app.add_middleware(
@@ -186,23 +218,36 @@ async def websocket_endpoint(websocket: WebSocket, task_id: int):
         await manager.disconnect(websocket, task_id)
 
 
-@app.get("/api/tasks/{task_id}/logs/history")
-def get_task_logs(task_id: int, db: Session = Depends(get_db)):
-    """获取任务的历史日志"""
-    from app.models import TaskLog
-    logs = db.query(TaskLog).filter(TaskLog.task_id == task_id).order_by(TaskLog.timestamp).all()
-    return [
-        {
-            "timestamp": log.timestamp.isoformat() if log.timestamp else None,
-            "level": log.level,
-            "module": log.module,
-            "stage": log.stage,
-            "message": log.message,
-            "progress": log.progress,
-            "extra_data": log.extra_data
-        }
-        for log in logs
-    ]
+def setup_routes(app: FastAPI):
+    """设置所有路由"""
+    # 注册系统相关路由
+    app.include_router(system_view.router, tags=["系统"])
+    
+    # 注册认证相关路由
+    app.include_router(auth_view.router, prefix="/api/auth", tags=["认证"])
+    
+    # 注册任务相关路由
+    app.include_router(task_view.router, prefix="/api/tasks", tags=["任务"])
+    
+    # 注册用户相关路由
+    app.include_router(user_view.router, prefix="/api/users", tags=["用户"])
+    
+    # 注册AI输出相关路由
+    from app.views.ai_output_view import task_ai_output_view, single_ai_output_view
+    app.include_router(task_ai_output_view.router, prefix="/api/tasks", tags=["AI输出"])
+    app.include_router(single_ai_output_view.router, prefix="/api/ai-outputs", tags=["AI输出"])
+    
+    # 注册问题反馈相关路由
+    app.include_router(issue_view.router, prefix="/api/issues", tags=["问题反馈"])
+    
+    # 注册任务日志相关路由
+    app.include_router(task_log_view.router, prefix="/api/tasks", tags=["任务日志"])
+    
+    # 注册运营数据统计相关路由
+    app.include_router(analytics_view.router, tags=["运营数据统计"])
+
+# 设置路由
+setup_routes(app)
 
 
 if __name__ == "__main__":
