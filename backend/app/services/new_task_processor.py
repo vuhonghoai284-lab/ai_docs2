@@ -32,10 +32,14 @@ class NewTaskProcessor:
         self.file_repo = FileInfoRepository(db)
         self.model_repo = AIModelRepository(db)
         self.settings = get_settings()
+        self.start_time = None  # 记录任务开始时间
     
     async def process_task(self, task_id: int):
         """处理任务"""
         try:
+            # 记录任务开始时间（使用UTC时间戳）
+            self.start_time = time.time()
+            
             # 记录开始日志
             await self._log(task_id, "INFO", "开始处理任务", "初始化", 0)
             
@@ -66,9 +70,12 @@ class NewTaskProcessor:
             
             async def progress_callback(message: str, progress: int):
                 """进度回调函数"""
+                # 记录日志并推送消息
                 await self._log(task_id, "INFO", message, "处理中", progress)
-                await manager.send_progress(task_id, progress, message)
+                # 更新任务进度
                 self.task_repo.update(task_id, progress=progress)
+                # 发送进度状态更新（不重复发送消息）
+                await manager.send_status(task_id, "processing")
             
             context['progress_callback'] = progress_callback
             
@@ -82,14 +89,14 @@ class NewTaskProcessor:
             await self._save_processing_results(task_id, context, result)
             
             # 完成任务
-            task = self.task_repo.get(task_id)
-            processing_time = time.time() - task.created_at.timestamp()
+            # 使用任务实际开始时间计算耗时，避免时区转换问题
+            processing_time = time.time() - self.start_time if self.start_time else 0
             self.task_repo.update(
                 task_id, 
                 status="completed",
                 progress=100,
                 processing_time=processing_time,
-                completed_at=datetime.now()
+                completed_at=datetime.utcnow()  # 使用UTC时间保持一致性
             )
             await manager.send_progress(task_id, 100, "完成")
             await manager.send_status(task_id, "completed")
@@ -131,7 +138,7 @@ class NewTaskProcessor:
         """保存处理结果"""
         await self._log(task_id, "INFO", "正在保存处理结果", "保存结果", 85)
         
-        # 保存文件解析结果
+        # 保存文件解析结果（非AI步骤，保存处理记录）
         if 'file_parsing_result' in context:
             self._save_ai_output(
                 task_id=task_id,
@@ -144,33 +151,29 @@ class NewTaskProcessor:
                 }
             )
         
-        # 保存文档处理结果
-        if 'document_processing_result' in context:
+        # 章节合并结果记录（非AI步骤，保存处理记录）
+        if 'section_merge_result' in context:
+            original_count = len(context.get('document_processing_result', []))
+            merged_count = len(context['section_merge_result'])
             self._save_ai_output(
                 task_id=task_id,
-                operation_type="preprocess",
-                input_text=context.get('file_parsing_result', '')[:1000],
+                operation_type="section_merge",
+                input_text=f"原始章节数: {original_count}",
                 result={
                     'status': 'success',
-                    'data': context['document_processing_result'],
-                    'processing_stage': 'document_processing'
+                    'data': {
+                        'original_sections_count': original_count,
+                        'merged_sections_count': merged_count,
+                        'merge_ratio': merged_count / original_count if original_count > 0 else 0,
+                        'merged_sections': context['section_merge_result'][:3]  # 保存前3个合并章节的概要
+                    },
+                    'processing_stage': 'section_merge'
                 }
             )
         
-        # 保存问题检测结果并存储到数据库
+        # 保存问题到数据库（问题检测的AI输出已由IssueDetector保存）
         if 'issue_detection_result' in context:
             issues = context['issue_detection_result']
-            
-            self._save_ai_output(
-                task_id=task_id,
-                operation_type="detect_issues",
-                input_text=str(context.get('document_processing_result', ''))[:1000],
-                result={
-                    'status': 'success',
-                    'data': {'issues': issues},
-                    'processing_stage': 'issue_detection'
-                }
-            )
             
             # 保存问题到数据库
             issue_count = len(issues) if issues else 0
@@ -208,11 +211,15 @@ class NewTaskProcessor:
     
     async def _log(self, task_id: int, level: str, message: str, stage: str = None, progress: int = None):
         """记录日志并实时推送"""
+        # 过滤空消息，避免产生无用的日志记录
+        if not message or not str(message).strip():
+            return
+            
         # 保存到数据库
         log = TaskLog(
             task_id=task_id,
             level=level,
-            message=message,
+            message=str(message).strip(),
             stage=stage,
             progress=progress
         )

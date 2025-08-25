@@ -177,6 +177,44 @@ const TaskList: React.FC = () => {
     return `${minutes}分${secs}秒`;
   };
 
+  const calculateActualProcessingTime = (record: Task) => {
+    // 计算基于时间戳的实际耗时（作为基准）
+    let actualTimeFromTimestamps = null;
+    if (record.status === 'completed' && record.completed_at && record.created_at) {
+      const startTime = new Date(record.created_at + 'Z').getTime(); // 明确指定UTC
+      const endTime = new Date(record.completed_at + 'Z').getTime(); // 明确指定UTC
+      actualTimeFromTimestamps = (endTime - startTime) / 1000;
+    }
+    
+    // 如果存储的processing_time与实际时间差异过大（超过1小时或者相差8小时左右），
+    // 则认为processing_time可能存在时区计算错误，使用实际时间计算
+    if (record.processing_time && actualTimeFromTimestamps) {
+      const timeDiff = Math.abs(record.processing_time - actualTimeFromTimestamps);
+      const eightHours = 8 * 3600; // 8小时的秒数
+      
+      // 如果时间差接近8小时（时区错误）或超过1小时（异常），使用实际计算时间
+      if (timeDiff > 3600 && (Math.abs(timeDiff - eightHours) < 300 || timeDiff > eightHours)) {
+        console.warn(`任务${record.id}存在时区计算错误，使用实际时间。存储时间：${record.processing_time}s，实际时间：${actualTimeFromTimestamps}s`);
+        return actualTimeFromTimestamps;
+      }
+      
+      // 否则使用存储的processing_time
+      return record.processing_time;
+    }
+    
+    // 如果只有processing_time，直接使用
+    if (record.processing_time) {
+      return record.processing_time;
+    }
+    
+    // 如果只能通过时间戳计算，使用实际计算时间
+    if (actualTimeFromTimestamps) {
+      return actualTimeFromTimestamps;
+    }
+    
+    return null;
+  };
+
   const formatChars = (chars?: number) => {
     if (!chars) return '-';
     if (chars < 1000) return `${chars}字`;
@@ -195,7 +233,7 @@ const TaskList: React.FC = () => {
           <div>
             <div style={{ fontWeight: 500 }}>{record.title || record.file_name}</div>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {record.file_name} · {formatFileSize(record.file_size)}
+              {record.file_name} · {formatFileSize(record.file_size || 0)}
             </Text>
             {record.document_chars && (
               <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
@@ -210,16 +248,30 @@ const TaskList: React.FC = () => {
       title: '创建人',
       key: 'creator',
       width: '10%',
-      render: (_: any, record: Task) => (
-        <div>
-          <div style={{ fontWeight: 500, fontSize: 13 }}>
-            {record.created_by_name || record.created_by || '系统'}
+      render: (_: any, record: Task) => {
+        // 显示真实的创建人名称，不显示系统用户
+        const creatorName = record.created_by_name || '未知用户';
+        let creatorType = '普通用户'; // 默认值
+        
+        if (record.created_by_type === 'system_admin') {
+          creatorType = '系统管理员';
+        } else if (record.created_by_type === 'admin') {
+          creatorType = '系统管理员'; // 管理员也显示为系统管理员
+        } else if (record.created_by_type === 'normal_user') {
+          creatorType = '普通用户';
+        }
+        
+        return (
+          <div>
+            <div style={{ fontWeight: 500, fontSize: 13 }}>
+              {creatorName}
+            </div>
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              {creatorType}
+            </Text>
           </div>
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            {record.created_by_type === 'admin' ? '管理员' : '用户'}
-          </Text>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: '模型',
@@ -238,7 +290,7 @@ const TaskList: React.FC = () => {
       ),
     },
     {
-      title: '状态与进度',
+      title: '状态',
       key: 'status_progress',
       width: '15%',
       render: (_: any, record: Task) => (
@@ -248,9 +300,24 @@ const TaskList: React.FC = () => {
           </div>
           {record.status === 'completed' ? (
             <div>
-              {record.processing_time && (
+              {(() => {
+                const actualTime = calculateActualProcessingTime(record);
+                return actualTime && (
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+                    耗时: {formatTime(actualTime)}
+                  </div>
+                );
+              })()}
+              {record.completed_at && (
                 <div style={{ fontSize: 11, color: '#8c8c8c' }}>
-                  耗时: {formatTime(record.processing_time)}
+                  完成: {new Date(record.completed_at + 'Z').toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  })} (本地时间)
                 </div>
               )}
             </div>
@@ -361,9 +428,9 @@ const TaskList: React.FC = () => {
       key: 'created_at',
       width: '10%',
       render: (date: string) => (
-        <Tooltip title={new Date(date).toLocaleString('zh-CN')}>
+        <Tooltip title={new Date(date + 'Z').toLocaleString('zh-CN') + ' (本地时间)'}>
           <Text style={{ fontSize: 12 }}>
-            {new Date(date).toLocaleDateString('zh-CN')}
+            {new Date(date + 'Z').toLocaleDateString('zh-CN')}
           </Text>
         </Tooltip>
       ),
@@ -467,11 +534,11 @@ const TaskList: React.FC = () => {
         <div className="task-info-grid">
           <div className="task-info-item">
             <div className="task-info-label">文件大小</div>
-            <div className="task-info-value">{formatFileSize(task.file_size)}</div>
+            <div className="task-info-value">{formatFileSize(task.file_size || 0)}</div>
           </div>
           <div className="task-info-item">
             <div className="task-info-label">创建时间</div>
-            <div className="task-info-value">{new Date(task.created_at).toLocaleDateString('zh-CN')}</div>
+            <div className="task-info-value">{new Date(task.created_at + 'Z').toLocaleDateString('zh-CN')}</div>
           </div>
           {task.document_chars && (
             <div className="task-info-item">
