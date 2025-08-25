@@ -9,7 +9,7 @@ const mockUsers: User[] = [
     display_name: '管理员',
     is_admin: true,
     is_system_admin: true,
-    avatar_url: null,
+    avatar_url: undefined,
     created_at: '2024-01-01T00:00:00Z'
   },
   {
@@ -18,7 +18,7 @@ const mockUsers: User[] = [
     display_name: '普通用户',
     is_admin: false,
     is_system_admin: false,
-    avatar_url: null,
+    avatar_url: undefined,
     created_at: '2024-01-01T00:00:00Z'
   }
 ]
@@ -32,7 +32,6 @@ const mockTasks: Task[] = [
     status: 'completed',
     progress: 100,
     created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T01:00:00Z'
   },
   {
     id: 2,
@@ -41,7 +40,6 @@ const mockTasks: Task[] = [
     status: 'processing',
     progress: 50,
     created_at: '2024-01-02T00:00:00Z',
-    updated_at: '2024-01-02T01:00:00Z'
   }
 ]
 
@@ -97,7 +95,6 @@ export const handlers = [
       status: 'pending',
       progress: 0,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
     }
     return HttpResponse.json(newTask)
   }),

@@ -34,12 +34,27 @@ class TaskResponse(BaseModel):
     user_id: Optional[int] = None
     file_id: Optional[int] = None
     ai_model_id: Optional[int] = None
+    created_by_name: Optional[str] = None
+    created_by_type: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
     
     @classmethod
-    def from_task_with_relations(cls, task, file_info=None, ai_model=None, issue_count: int = 0, processed_issues: int = 0):
+    def from_task_with_relations(cls, task, file_info=None, ai_model=None, user_info=None, issue_count: int = 0, processed_issues: int = 0):
         """从Task模型及其关联对象构建响应"""
+        # 确定创建人名称和类型
+        created_by_name = None
+        created_by_type = None
+        
+        if user_info:
+            created_by_name = user_info.display_name or user_info.uid
+            if user_info.is_system_admin:
+                created_by_type = 'system_admin'
+            elif user_info.is_admin:
+                created_by_type = 'admin'
+            else:
+                created_by_type = 'normal_user'
+        
         return cls(
             id=task.id,
             title=task.title,
@@ -58,7 +73,9 @@ class TaskResponse(BaseModel):
             error_message=task.error_message,
             user_id=task.user_id,
             file_id=task.file_id,
-            ai_model_id=task.model_id
+            ai_model_id=task.model_id,
+            created_by_name=created_by_name,
+            created_by_type=created_by_type
         )
         
 

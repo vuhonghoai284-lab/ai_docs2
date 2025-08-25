@@ -2,7 +2,7 @@
 AI输出相关的DTO
 """
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union, List
 from datetime import datetime
 
 
@@ -15,7 +15,7 @@ class AIOutputResponse(BaseModel):
     section_index: Optional[int] = None
     input_text: str
     raw_output: str
-    parsed_output: Optional[Dict[str, Any]] = None
+    parsed_output: Optional[Union[Dict[str, Any], List[Any]]] = None  # 支持字典和列表两种类型
     status: str
     error_message: Optional[str] = None
     tokens_used: Optional[int] = None

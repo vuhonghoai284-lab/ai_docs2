@@ -135,7 +135,8 @@ class AuthService(IAuthService):
         """验证令牌"""
         try:
             payload = jwt.decode(token, self.SECRET_KEY, algorithms=[self.ALGORITHM])
-            user_id: str = payload.get("sub")
+            # 支持两种字段：user_id（新格式）和sub（旧格式）
+            user_id = payload.get("user_id") or payload.get("sub")
             if user_id is None:
                 return None
             user = self.user_repo.get_by_id(int(user_id))

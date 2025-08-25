@@ -29,6 +29,9 @@ class TaskView(BaseView):
         self.router.add_api_route("/{task_id}", self.delete_task, methods=["DELETE"])
         self.router.add_api_route("/{task_id}/retry", self.retry_task, methods=["POST"])
         self.router.add_api_route("/{task_id}/report", self.download_report, methods=["GET"])
+        print("🛠️  TaskView 路由已设置：")
+        for route in self.router.routes:
+            print(f"   {route.methods} {route.path}")
     
     async def create_task(
         self,
@@ -63,6 +66,7 @@ class TaskView(BaseView):
         db: Session = Depends(get_db)
     ) -> TaskDetail:
         """获取任务详情"""
+        print(f"🎯 TaskView.get_task_detail 被调用, task_id={task_id}, user={current_user.uid}")
         service = TaskService(db)
         task_detail = service.get_task_detail(task_id)
         

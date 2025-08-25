@@ -16,14 +16,23 @@ from app.views.base import BaseView
 class AIOutputView(BaseView):
     """AI输出视图类"""
     
-    def __init__(self):
+    def __init__(self, route_type="single"):
         super().__init__()
-        self.router = APIRouter(tags=["ai-outputs"])
+        self.route_type = route_type
+        if route_type == "task":
+            self.router = APIRouter(tags=["AI输出"])
+        else:
+            self.router = APIRouter(tags=["AI输出"])
         self._setup_routes()
     
     def _setup_routes(self):
-        """设置路由 - 路由将由main.py手动注册以避免冲突"""
-        pass
+        """设置路由"""
+        if self.route_type == "task":
+            # 任务相关的AI输出路由
+            self.router.add_api_route("/{task_id}/ai-outputs", self.get_task_ai_outputs, methods=["GET"])
+        else:
+            # 单独的AI输出详情路由  
+            self.router.add_api_route("/{output_id}", self.get_ai_output_detail, methods=["GET"])
     
     def get_task_ai_outputs(
         self,
@@ -69,6 +78,10 @@ class AIOutputView(BaseView):
         return AIOutputResponse.from_orm(output)
 
 
-# 创建视图实例并导出router
+# 创建两个不同的视图实例
+task_ai_output_view = AIOutputView(route_type="task")
+single_ai_output_view = AIOutputView(route_type="single")
+
+# 为了保持兼容性，保留原有的ai_output_view实例
 ai_output_view = AIOutputView()
 router = ai_output_view.router

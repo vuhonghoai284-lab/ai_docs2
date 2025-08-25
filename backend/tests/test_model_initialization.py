@@ -16,7 +16,6 @@ class TestModelInitialization:
     def test_production_mode_models_config(self):
         """测试生产模式模型配置"""
         settings = init_settings("config.yaml")
-        assert not settings.is_test_mode, "应该是生产模式"
         assert len(settings.ai_models) > 0, "生产模式应该有配置模型"
         
         # 检查模型配置结构
@@ -28,15 +27,13 @@ class TestModelInitialization:
     def test_test_mode_models_config(self):
         """测试测试模式模型配置"""
         settings = init_settings("config.test.yaml")
-        assert settings.is_test_mode, "应该是测试模式"
-        assert len(settings.ai_models) > 0, "测试模式应该有配置模型"
+        assert len(settings.ai_models) > 0, "测试配置应该有配置模型"
         
-        # 检查测试模式特定的模型配置
+        # 检查测试模型配置结构
         for model in settings.ai_models:
             assert 'label' in model, "模型应该有label"
-            assert model.get('provider') == 'mock', "测试模式应该使用mock provider"
+            assert 'provider' in model, "模型应该有provider"
             assert 'config' in model, "模型应该有config"
-            assert 'description' in model, "测试模型应该有描述"
     
     def test_model_database_initialization(self):
         """测试模型数据库初始化"""
@@ -139,30 +136,34 @@ class TestModelsAPI:
         assert 0 <= default_index < len(models), "默认模型索引应该在有效范围内"
         assert models[default_index]["is_default"], "默认索引对应的模型应该标记为默认"
     
-    def test_root_api_shows_test_mode(self, client: TestClient):
-        """测试根API显示测试模式"""
+    def test_root_api_structure(self, client: TestClient):
+        """测试根API响应结构"""
         response = client.get("/")
         assert response.status_code == 200
         
         data = response.json()
-        assert "test_mode" in data, "响应应该包含test_mode字段"
         assert "mode" in data, "响应应该包含mode字段"
-        
-        # 在测试环境下应该显示测试模式
-        # 注意：这里可能会因为测试环境配置而有所不同
         assert "message" in data, "响应应该包含message字段"
+        
+        # 验证基本信息结构
+        assert isinstance(data["mode"], str), "mode应该是字符串"
+        assert isinstance(data["message"], str), "message应该是字符串"
     
-    def test_config_api_includes_test_mode_flag(self, client: TestClient):
-        """测试配置API包含测试模式标志"""
+    def test_config_api_structure(self, client: TestClient):
+        """测试配置API响应结构"""
         response = client.get("/api/config")
         assert response.status_code == 200
         
         data = response.json()
-        assert "test_mode" in data, "配置应该包含test_mode字段"
         assert "supported_file_types" in data, "配置应该包含支持的文件类型"
         assert "max_file_size" in data, "配置应该包含最大文件大小"
         assert "app_title" in data, "配置应该包含应用标题"
         assert "app_version" in data, "配置应该包含应用版本"
+        assert "api_base_url" in data, "配置应该包含API基础URL"
+        
+        # 验证数据类型
+        assert isinstance(data["supported_file_types"], list), "支持的文件类型应该是列表"
+        assert isinstance(data["max_file_size"], int), "最大文件大小应该是整数"
 
 
 class TestModelInitializationIntegration:

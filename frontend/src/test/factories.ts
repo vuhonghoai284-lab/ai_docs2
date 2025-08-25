@@ -8,7 +8,7 @@ export const userFactory = {
     display_name: '管理员',
     is_admin: true,
     is_system_admin: true,
-    avatar_url: null,
+    avatar_url: undefined,
     created_at: '2024-01-01T00:00:00Z'
   }),
   
@@ -18,7 +18,7 @@ export const userFactory = {
     display_name: '普通用户',
     is_admin: false,
     is_system_admin: false,
-    avatar_url: null,
+    avatar_url: undefined,
     created_at: '2024-01-01T00:00:00Z'
   }),
   
@@ -28,7 +28,7 @@ export const userFactory = {
     display_name: '测试用户',
     is_admin: false,
     is_system_admin: false,
-    avatar_url: null,
+    avatar_url: undefined,
     created_at: '2024-01-01T00:00:00Z',
     ...overrides
   })
@@ -43,7 +43,6 @@ export const taskFactory = {
     status: 'pending',
     progress: 0,
     created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z'
   }),
   
   processing: (): Task => ({
@@ -53,7 +52,6 @@ export const taskFactory = {
     status: 'processing',
     progress: 50,
     created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T01:00:00Z'
   }),
   
   completed: (): Task => ({
@@ -63,7 +61,6 @@ export const taskFactory = {
     status: 'completed',
     progress: 100,
     created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T02:00:00Z'
   }),
   
   failed: (): Task => ({
@@ -73,7 +70,6 @@ export const taskFactory = {
     status: 'failed',
     progress: 0,
     created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:30:00Z'
   }),
   
   custom: (overrides: Partial<Task> = {}): Task => ({
@@ -83,7 +79,6 @@ export const taskFactory = {
     status: 'pending',
     progress: 0,
     created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
     ...overrides
   })
 }

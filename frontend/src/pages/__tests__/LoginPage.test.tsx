@@ -171,10 +171,10 @@ describe('LoginPage', () => {
   it('should process auth code from URL parameters', async () => {
     // Mock URL with auth code
     delete (window as any).location
-    window.location = {
+    ;(window as any).location = {
       ...window.location,
       search: '?code=auth-code-123'
-    } as Location
+    }
 
     ;(fetch as any).mockResolvedValueOnce({
       ok: true,
@@ -198,10 +198,10 @@ describe('LoginPage', () => {
   it('should handle auth code processing error', async () => {
     // Mock URL with auth code
     delete (window as any).location
-    window.location = {
+    ;(window as any).location = {
       ...window.location,
       search: '?code=invalid-code'
-    } as Location
+    }
 
     ;(fetch as any).mockResolvedValueOnce({
       ok: false,

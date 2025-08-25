@@ -47,7 +47,7 @@ export const taskAPI = {
       formData.append('model_index', modelIndex.toString());
     }
     
-    const response = await api.post<Task>('/tasks', formData, {
+    const response = await api.post<Task>('/tasks/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -57,7 +57,7 @@ export const taskAPI = {
 
   // 获取任务列表
   getTasks: async () => {
-    const response = await api.get<Task[]>('/tasks');
+    const response = await api.get<Task[]>('/tasks/');
     return response.data;
   },
 

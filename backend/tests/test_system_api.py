@@ -17,9 +17,8 @@ class TestSystemAPI:
         data = response.json()
         assert "message" in data
         assert "mode" in data
-        assert "test_mode" in data
         assert data["message"] == "AI文档测试系统后端API v2.0"
-        assert isinstance(data["test_mode"], bool)
+        assert isinstance(data["mode"], str)
     
     def test_get_client_config(self, client: TestClient):
         """测试获取客户端配置 - SYS-002"""
@@ -29,7 +28,7 @@ class TestSystemAPI:
         data = response.json()
         required_fields = [
             "api_base_url", "ws_base_url", "app_title", 
-            "app_version", "test_mode", "supported_file_types", 
+            "app_version", "supported_file_types", 
             "max_file_size"
         ]
         
@@ -39,7 +38,6 @@ class TestSystemAPI:
         # 验证数据类型
         assert isinstance(data["supported_file_types"], list)
         assert isinstance(data["max_file_size"], int)
-        assert isinstance(data["test_mode"], bool)
         assert data["app_title"] == "AI文档测试系统"
         assert data["app_version"] == "2.0.0"
     

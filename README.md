@@ -13,7 +13,7 @@
 
 ## 技术栈
 
-- **后端**: FastAPI + SQLite + Python 3.8+
+- **后端**: FastAPI + SQLite/MySQL + Python 3.8+
 - **前端**: React + TypeScript + Ant Design
 - **AI服务**: vLLM（需自行部署）
 
@@ -130,22 +130,91 @@ ai_doc_test/
 
 ## 配置说明
 
-编辑 `backend/config.yaml` 文件：
+### 数据库配置
+
+系统支持SQLite和MySQL两种数据库。编辑 `backend/config.yaml` 文件：
+
+#### SQLite配置（默认）
+```yaml
+# 数据库配置
+database:
+  type: "sqlite"
+  sqlite:
+    path: "./data/app.db"
+```
+
+#### MySQL配置
+```yaml
+# 数据库配置
+database:
+  type: "mysql"
+  mysql:
+    host: "localhost"
+    port: 3306
+    username: "root"
+    password: "your_password"
+    database: "ai_doc_test"
+    charset: "utf8mb4"
+    # 连接池配置
+    pool:
+      pool_size: 5
+      max_overflow: 10
+      pool_timeout: 30
+      pool_recycle: 3600
+      pool_pre_ping: true
+```
+
+#### 通过环境变量配置MySQL
+```yaml
+database:
+  type: "mysql"
+  mysql:
+    host: "${MYSQL_HOST:localhost}"
+    port: "${MYSQL_PORT:3306}"
+    username: "${MYSQL_USERNAME:root}"
+    password: "${MYSQL_PASSWORD}"
+    database: "${MYSQL_DATABASE:ai_doc_test}"
+    charset: "utf8mb4"
+```
+
+对应的环境变量：
+```bash
+export MYSQL_HOST=localhost
+export MYSQL_PORT=3306
+export MYSQL_USERNAME=root
+export MYSQL_PASSWORD=your_password
+export MYSQL_DATABASE=ai_doc_test
+```
+
+### 其他配置
 
 ```yaml
-# 数据库
-database: ./data/app.db
-
-# AI服务（需要配置实际的vLLM服务地址）
-ai_api: http://localhost:8000
+# AI模型配置
+ai_models:
+  default_index: 0
+  models:
+    - label: "GPT-4o Mini (快速)"
+      provider: "openai"
+      config:
+        api_key: "${OPENAI_API_KEY}"
+        base_url: "https://api.openai.com/v1"
+        model: "gpt-4o-mini"
 
 # 文件设置  
-max_file_size: 10485760  # 10MB
-chunk_size: 8000
+file_settings:
+  max_file_size: 10485760  # 10MB
+  allowed_extensions:
+    - pdf
+    - docx
+    - md
+    - txt
 
-# 目录
-upload_dir: ./data/uploads
-report_dir: ./data/reports
+# 目录配置
+directories:
+  upload_dir: ./data/uploads
+  report_dir: ./data/reports
+  log_dir: ./data/logs
+  temp_dir: ./data/temp
 ```
 
 ## 注意事项
@@ -153,7 +222,7 @@ report_dir: ./data/reports
 1. **AI服务**: 当前版本使用模拟的AI返回数据。实际使用时需要部署vLLM服务并配置正确的API地址。
 2. **文件大小**: 默认限制为10MB，可在配置文件中修改。
 3. **并发处理**: 系统支持同时处理多个任务。
-4. **数据存储**: 使用SQLite数据库，适合测试和小规模使用。
+4. **数据存储**: 默认使用SQLite数据库，适合测试和小规模使用。生产环境推荐使用MySQL数据库。
 
 ## 常见问题
 

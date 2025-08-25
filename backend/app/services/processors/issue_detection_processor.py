@@ -14,12 +14,14 @@ class IssueDetectionProcessor(ITaskProcessor):
         self.ai_service_provider = ai_service_provider
     
     async def can_handle(self, context: Dict[str, Any]) -> bool:
-        """检查是否有文档处理结果"""
-        return 'document_processing_result' in context
+        """检查是否有文档处理结果或章节合并结果"""
+        return ('section_merge_result' in context or 
+                'document_processing_result' in context)
     
     async def process(self, context: Dict[str, Any], progress_callback: Optional[Callable] = None) -> ProcessingResult:
         """执行问题检测"""
-        sections = context.get('document_processing_result')
+        # 优先使用合并后的章节，如果没有则使用原始章节
+        sections = context.get('section_merge_result') or context.get('document_processing_result')
         task_id = context.get('task_id')
         
         if not sections:
@@ -28,8 +30,10 @@ class IssueDetectionProcessor(ITaskProcessor):
                 error="没有可检测的章节内容"
             )
         
+        # 记录使用的章节类型
+        section_type = "merged" if 'section_merge_result' in context else "original"
         if progress_callback:
-            await progress_callback("开始问题检测", 60)
+            await progress_callback(f"开始问题检测 (使用{section_type}章节)", 60)
         
         try:
             issue_detector = self.ai_service_provider.get_issue_detector()

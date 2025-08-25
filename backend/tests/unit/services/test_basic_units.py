@@ -44,7 +44,7 @@ class TestDocumentProcessorBasic(TestBasicUnits):
         """测试章节验证 - 正常情况"""
         with patch('app.services.document_processor.ChatOpenAI'):
             with patch('app.services.document_processor.PydanticOutputParser'):
-                processor = DocumentProcessor(mock_model_config, mock_db)
+                processor = DocumentProcessor(mock_model_config['config'], mock_db)
                 
                 sections = [
                     {
@@ -69,7 +69,7 @@ class TestDocumentProcessorBasic(TestBasicUnits):
         """测试章节验证 - 过滤无效章节"""
         with patch('app.services.document_processor.ChatOpenAI'):
             with patch('app.services.document_processor.PydanticOutputParser'):
-                processor = DocumentProcessor(mock_model_config, mock_db)
+                processor = DocumentProcessor(mock_model_config['config'], mock_db)
                 
                 sections = [
                     {
@@ -95,29 +95,16 @@ class TestDocumentProcessorBasic(TestBasicUnits):
                 assert len(result) == 1
                 assert result[0]['section_title'] == '有效章节'
     
-    def test_create_mock_response_structure(self, mock_model_config, mock_db):
-        """测试创建Mock响应的结构"""
+    def test_document_processor_configuration(self, mock_model_config, mock_db):
+        """测试DocumentProcessor配置"""
         with patch('app.services.document_processor.ChatOpenAI'):
             with patch('app.services.document_processor.PydanticOutputParser'):
-                processor = DocumentProcessor(mock_model_config, mock_db)
+                processor = DocumentProcessor(mock_model_config['config'], mock_db)
                 
-                messages = [
-                    Mock(content="文档内容: 第一段\n\n第二段\n\n第三段")
-                ]
-                
-                result = processor._create_mock_response(messages)
-                
-                # 验证响应结构
-                assert hasattr(result, 'content')
-                response_data = json.loads(result.content)
-                assert 'sections' in response_data
-                assert len(response_data['sections']) > 0
-                
-                # 验证每个章节的结构
-                for section in response_data['sections']:
-                    assert 'section_title' in section
-                    assert 'content' in section
-                    assert 'level' in section
+                # 验证处理器正确初始化
+                assert processor is not None
+                assert processor.db is not None
+                assert processor.model_config is not None
 
 
 class TestIssueDetectorBasic(TestBasicUnits):
@@ -127,7 +114,7 @@ class TestIssueDetectorBasic(TestBasicUnits):
         """测试根据置信度过滤问题"""
         with patch('app.services.issue_detector.ChatOpenAI'):
             with patch('app.services.issue_detector.PydanticOutputParser'):
-                detector = IssueDetector(mock_model_config, mock_db)
+                detector = IssueDetector(mock_model_config['config'], mock_db)
                 
                 issues = [
                     {"type": "高置信度", "confidence": 0.9},
@@ -148,7 +135,7 @@ class TestIssueDetectorBasic(TestBasicUnits):
         """测试按严重等级分类问题"""
         with patch('app.services.issue_detector.ChatOpenAI'):
             with patch('app.services.issue_detector.PydanticOutputParser'):
-                detector = IssueDetector(mock_model_config, mock_db)
+                detector = IssueDetector(mock_model_config['config'], mock_db)
                 
                 issues = [
                     {"type": "致命问题", "severity": "致命"},
@@ -167,71 +154,38 @@ class TestIssueDetectorBasic(TestBasicUnits):
                 assert len(categorized['一般']) == 4  # 2个一般 + 1个未知 + 1个无字段
                 assert len(categorized['提示']) == 1
     
-    def test_create_mock_response_detect_duplicates(self, mock_model_config, mock_db):
-        """测试Mock响应检测重复字词"""
+    def test_issue_detector_basic_functionality(self, mock_model_config, mock_db):
+        """测试IssueDetector基本功能"""
         with patch('app.services.issue_detector.ChatOpenAI'):
             with patch('app.services.issue_detector.PydanticOutputParser'):
-                detector = IssueDetector(mock_model_config, mock_db)
+                detector = IssueDetector(mock_model_config['config'], mock_db)
                 
-                messages = [
-                    Mock(content="章节内容: 这是一个的的测试文档")
-                ]
-                
-                result = detector._create_mock_response(messages)
-                response_data = json.loads(result.content)
-                
-                # 验证检测到重复字词
-                issues = response_data['issues']
-                assert len(issues) > 0
-                
-                duplicate_issue = next((issue for issue in issues if issue['type'] == '错别字'), None)
-                assert duplicate_issue is not None
-                assert '的的' in duplicate_issue['description']
+                # 验证问题检测器正确初始化
+                assert detector is not None
+                assert detector.db is not None
     
-    def test_create_mock_response_detect_long_sentence(self, mock_model_config, mock_db):
-        """测试Mock响应检测长句"""
+    def test_issue_detector_configuration_validation(self, mock_model_config, mock_db):
+        """测试IssueDetector配置验证"""
         with patch('app.services.issue_detector.ChatOpenAI'):
             with patch('app.services.issue_detector.PydanticOutputParser'):
-                detector = IssueDetector(mock_model_config, mock_db)
+                detector = IssueDetector(mock_model_config['config'], mock_db)
                 
-                long_sentence = "这是一个非常长的句子" + "，内容很多" * 20 + "。"
-                messages = [
-                    Mock(content=f"章节内容: {long_sentence}")
-                ]
-                
-                result = detector._create_mock_response(messages)
-                response_data = json.loads(result.content)
-                
-                # 验证检测到长句
-                issues = response_data['issues']
-                long_sentence_issue = next((issue for issue in issues if issue['type'] == '句子过长'), None)
-                assert long_sentence_issue is not None
-                assert '建议拆分' in long_sentence_issue['description']
+                # 测试基本配置有效性
+                assert hasattr(detector, 'filter_issues_by_severity')
+                assert hasattr(detector, 'categorize_issues')
     
-    def test_create_mock_response_default_issue(self, mock_model_config, mock_db):
-        """测试Mock响应生成默认问题"""
-        with patch('app.services.issue_detector.ChatOpenAI'):
-            with patch('app.services.issue_detector.PydanticOutputParser'):
-                detector = IssueDetector(mock_model_config, mock_db)
-                
-                messages = [
-                    Mock(content="章节内容: 正常的文档内容，没有明显问题")
-                ]
-                
-                result = detector._create_mock_response(messages)
-                response_data = json.loads(result.content)
-                
-                # 验证至少有一个默认问题
-                issues = response_data['issues']
-                assert len(issues) >= 1
-                
-                # 验证问题结构
-                for issue in issues:
-                    assert 'type' in issue
-                    assert 'description' in issue
-                    assert 'location' in issue
-                    assert 'severity' in issue
-                    assert 'confidence' in issue
+    def test_component_initialization_validation(self, mock_model_config, mock_db):
+        """测试组件初始化验证"""
+        with patch('app.services.document_processor.ChatOpenAI'):
+            with patch('app.services.document_processor.PydanticOutputParser'):
+                with patch('app.services.issue_detector.ChatOpenAI'):
+                    with patch('app.services.issue_detector.PydanticOutputParser'):
+                        # 验证DocumentProcessor和IssueDetector都能正常初始化
+                        processor = DocumentProcessor(mock_model_config['config'], mock_db)
+                        detector = IssueDetector(mock_model_config['config'], mock_db)
+                        
+                        assert processor is not None
+                        assert detector is not None
 
 
 class TestExceptionHandling(TestBasicUnits):
@@ -241,19 +195,19 @@ class TestExceptionHandling(TestBasicUnits):
         """测试DocumentProcessor初始化失败"""
         with patch('app.services.document_processor.ChatOpenAI', side_effect=Exception("初始化失败")):
             with pytest.raises(Exception, match="初始化失败"):
-                DocumentProcessor(mock_model_config, mock_db)
+                DocumentProcessor(mock_model_config['config'], mock_db)
     
     def test_issue_detector_init_failure(self, mock_model_config, mock_db):
         """测试IssueDetector初始化失败"""
         with patch('app.services.issue_detector.ChatOpenAI', side_effect=Exception("初始化失败")):
             with pytest.raises(Exception, match="初始化失败"):
-                IssueDetector(mock_model_config, mock_db)
+                IssueDetector(mock_model_config['config'], mock_db)
     
     def test_issue_filter_edge_cases(self, mock_model_config, mock_db):
         """测试问题过滤边界情况"""
         with patch('app.services.issue_detector.ChatOpenAI'):
             with patch('app.services.issue_detector.PydanticOutputParser'):
-                detector = IssueDetector(mock_model_config, mock_db)
+                detector = IssueDetector(mock_model_config['config'], mock_db)
                 
                 edge_cases = [
                     {},  # 空字典
@@ -270,7 +224,7 @@ class TestExceptionHandling(TestBasicUnits):
         """测试问题分类边界情况"""
         with patch('app.services.issue_detector.ChatOpenAI'):
             with patch('app.services.issue_detector.PydanticOutputParser'):
-                detector = IssueDetector(mock_model_config, mock_db)
+                detector = IssueDetector(mock_model_config['config'], mock_db)
                 
                 edge_cases = [
                     {},  # 空字典

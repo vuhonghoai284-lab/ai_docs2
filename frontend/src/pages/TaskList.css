@@ -177,7 +177,8 @@
 
 .task-table .ant-table-tbody > tr:hover {
   background: rgba(116, 185, 255, 0.04);
-  transform: scale(1.01);
+  /* 移除scale变换以避免勾选框位置问题 */
+  transform: none;
 }
 
 .task-table .ant-table-tbody > tr > td {

@@ -19,6 +19,7 @@ class TaskProcessingStep(Enum):
     """任务处理步骤枚举"""
     FILE_PARSING = "file_parsing"
     DOCUMENT_PROCESSING = "document_processing"
+    SECTION_MERGE = "section_merge"
     ISSUE_DETECTION = "issue_detection"
     RESULT_VALIDATION = "result_validation"
     REPORT_GENERATION = "report_generation"
@@ -51,14 +52,15 @@ class ITaskProcessor(ABC):
         if await self.can_handle(context):
             result = await self.process(context, progress_callback)
             
-            # 如果处理成功且有下一个处理器，继续传递
-            if result.success and self.next_processor:
-                # 更新上下文
+            # 如果处理成功，更新上下文
+            if result.success:
                 context.update(result.metadata)
                 if result.data:
                     context[f"{self.step_type.value}_result"] = result.data
                 
-                return await self.next_processor.handle(context, progress_callback)
+                # 如果有下一个处理器，继续传递
+                if self.next_processor:
+                    return await self.next_processor.handle(context, progress_callback)
             
             return result
         

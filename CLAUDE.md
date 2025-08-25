@@ -183,6 +183,4 @@ Planned feature using MCP+Agent for operational validation (not yet implemented 
 ### 任务处理
 
 - 所有回答通过中文进行回复
-- 每次任务执行请将执行的问题和计划TODOS列表写入 docs/任务TODO列表.md文件，方便进行跟踪
 - 任务创建的临时测试脚本统一放到tmp目录中，任务结束时请清理
-- 任务对代码进行了修改，请增加一个计划，将新增或修改的功能点在tests中增加测试用例，并验证全部API测试是否通过

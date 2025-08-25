@@ -13,6 +13,7 @@ from app.repositories.issue import IssueRepository
 from app.repositories.ai_output import AIOutputRepository
 from app.repositories.file_info import FileInfoRepository
 from app.repositories.ai_model import AIModelRepository
+from app.repositories.user import UserRepository
 from app.dto.task import TaskResponse, TaskDetail
 from app.dto.issue import IssueResponse
 from app.core.config import get_settings
@@ -30,6 +31,7 @@ class TaskService(ITaskService):
         self.ai_output_repo = AIOutputRepository(db)
         self.file_repo = FileInfoRepository(db)
         self.model_repo = AIModelRepository(db)
+        self.user_repo = UserRepository(db)
         self.settings = get_settings()
     
     async def create_task(self, file: UploadFile, title: Optional[str] = None, ai_model_index: Optional[int] = None, user_id: Optional[int] = None) -> TaskResponse:
@@ -116,9 +118,10 @@ class TaskService(ITaskService):
         # 获取关联数据构建响应
         file_info = self.file_repo.get_by_id(task.file_id) if task.file_id else None
         ai_model = self.model_repo.get_by_id(task.model_id) if task.model_id else None
+        user_info = self.user_repo.get_by_id(task.user_id) if task.user_id else None
         issue_count = self.task_repo.count_issues(task.id)
         processed_issues = self.task_repo.count_processed_issues(task.id)
-        return TaskResponse.from_task_with_relations(task, file_info, ai_model, issue_count, processed_issues)
+        return TaskResponse.from_task_with_relations(task, file_info, ai_model, user_info, issue_count, processed_issues)
     
     def get_all_tasks(self) -> List[TaskResponse]:
         """获取所有任务"""
@@ -127,9 +130,10 @@ class TaskService(ITaskService):
         for task in tasks:
             file_info = self.file_repo.get_by_id(task.file_id) if task.file_id else None
             ai_model = self.model_repo.get_by_id(task.model_id) if task.model_id else None
+            user_info = self.user_repo.get_by_id(task.user_id) if task.user_id else None
             issue_count = self.task_repo.count_issues(task.id)
             processed_issues = self.task_repo.count_processed_issues(task.id)
-            task_resp = TaskResponse.from_task_with_relations(task, file_info, ai_model, issue_count, processed_issues)
+            task_resp = TaskResponse.from_task_with_relations(task, file_info, ai_model, user_info, issue_count, processed_issues)
             result.append(task_resp)
         return result
     
@@ -144,24 +148,29 @@ class TaskService(ITaskService):
         for task in tasks:
             file_info = self.file_repo.get_by_id(task.file_id) if task.file_id else None
             ai_model = self.model_repo.get_by_id(task.model_id) if task.model_id else None
+            user_info = self.user_repo.get_by_id(task.user_id) if task.user_id else None
             issue_count = self.task_repo.count_issues(task.id)
             processed_issues = self.task_repo.count_processed_issues(task.id)
-            task_resp = TaskResponse.from_task_with_relations(task, file_info, ai_model, issue_count, processed_issues)
+            task_resp = TaskResponse.from_task_with_relations(task, file_info, ai_model, user_info, issue_count, processed_issues)
             result.append(task_resp)
         return result
     
     def get_task_detail(self, task_id: int) -> TaskDetail:
         """获取任务详情"""
+        print(f"🔍 正在查找任务: {task_id}")
         task = self.task_repo.get_by_id(task_id)
+        print(f"🔍 找到任务: {task}")
         if not task:
+            print(f"❌ 任务 {task_id} 不存在")
             raise HTTPException(404, "任务不存在")
         
         issues = self.issue_repo.get_by_task_id(task_id)
         
         file_info = self.file_repo.get_by_id(task.file_id) if task.file_id else None
         ai_model = self.model_repo.get_by_id(task.model_id) if task.model_id else None
+        user_info = self.user_repo.get_by_id(task.user_id) if task.user_id else None
         processed_issues = self.task_repo.count_processed_issues(task_id)
-        task_resp = TaskResponse.from_task_with_relations(task, file_info, ai_model, len(issues), processed_issues)
+        task_resp = TaskResponse.from_task_with_relations(task, file_info, ai_model, user_info, len(issues), processed_issues)
         
         return TaskDetail(
             task=task_resp,
@@ -213,9 +222,10 @@ class TaskService(ITaskService):
         
         file_info = self.file_repo.get_by_id(task.file_id) if task.file_id else None
         ai_model = self.model_repo.get_by_id(task.model_id) if task.model_id else None
+        user_info = self.user_repo.get_by_id(task.user_id) if task.user_id else None
         issue_count = self.task_repo.count_issues(task.id)
         processed_issues = self.task_repo.count_processed_issues(task.id)
-        return TaskResponse.from_task_with_relations(task, file_info, ai_model, issue_count, processed_issues)
+        return TaskResponse.from_task_with_relations(task, file_info, ai_model, user_info, issue_count, processed_issues)
     
     def update(self, entity_id: int, **kwargs) -> Optional[TaskResponse]:
         """更新任务"""
@@ -225,6 +235,7 @@ class TaskService(ITaskService):
         
         file_info = self.file_repo.get_by_id(updated_task.file_id) if updated_task.file_id else None
         ai_model = self.model_repo.get_by_id(updated_task.model_id) if updated_task.model_id else None
+        user_info = self.user_repo.get_by_id(updated_task.user_id) if updated_task.user_id else None
         issue_count = self.task_repo.count_issues(updated_task.id)
         processed_issues = self.task_repo.count_processed_issues(updated_task.id)
-        return TaskResponse.from_task_with_relations(updated_task, file_info, ai_model, issue_count, processed_issues)
+        return TaskResponse.from_task_with_relations(updated_task, file_info, ai_model, user_info, issue_count, processed_issues)

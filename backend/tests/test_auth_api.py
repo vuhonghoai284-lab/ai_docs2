@@ -20,10 +20,10 @@ class TestAuthAPI:
         
         # 验证URL包含必要的OAuth2参数
         auth_url = data["auth_url"]
-        assert "oauth2/authorize" in auth_url
+        assert "oauth/authorize" in auth_url
         assert "client_id=" in auth_url
         assert "response_type=code" in auth_url
-        assert "redirect_url=" in auth_url
+        assert "redirect_uri=" in auth_url  # 应该是redirect_uri而不是redirect_url
         assert "scope=" in auth_url
     
     def test_third_party_login_success(self, client: TestClient):

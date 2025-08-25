@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 
 from app.services.prompt_loader import prompt_loader
 from app.models.ai_output import AIOutput
-from app.core.config import get_settings
 
 
 # 定义文档章节模型
@@ -58,21 +57,26 @@ class DocumentProcessor:
             console_handler.setFormatter(formatter)
             self.logger.addHandler(console_handler)
         
-        # 从配置中提取参数
-        config = model_config.get('config', {})
-        self.provider = model_config.get('provider', 'openai')
-        self.api_key = config.get('api_key')
-        self.api_base = config.get('base_url')
-        self.model_name = config.get('model')
-        self.temperature = config.get('temperature', 0.3)
-        self.max_tokens = config.get('max_tokens', 4000)
-        self.timeout = config.get('timeout', 60)
-        self.max_retries = config.get('max_retries', 3)
+        # 从配置中提取参数 - 直接从model_config获取，因为传入的已经是config部分
+        self.provider = model_config.get('provider', 'openai')  # 这个字段可能不在config中
+        self.api_key = model_config.get('api_key')
+        self.api_base = model_config.get('base_url')
+        self.model_name = model_config.get('model')
+        self.temperature = model_config.get('temperature', 0.3)
+        self.max_tokens = model_config.get('max_tokens', 4000)
+        self.timeout = model_config.get('timeout', 60)
+        self.max_retries = model_config.get('max_retries', 3)
+        
+        # 检查API密钥是否正确获取
+        if not self.api_key:
+            self.logger.error(f"❌ 未找到API密钥，模型配置: {model_config}")
+            raise ValueError(f"未找到API密钥，请检查环境变量和配置文件")
         
         self.logger.info(f"📚 文档处理器初始化: Provider={self.provider}, Model={self.model_name}")
+        self.logger.info(f"🔑 API密钥状态: {'已配置' if self.api_key else '未配置'} (前6位: {self.api_key[:6]}...)")
         
         try:
-            # 初始化ChatOpenAI模型
+            # 初始化ChatOpenAI模型 - 支持多种兼容OpenAI API的提供商
             self.model = ChatOpenAI(
                 api_key=self.api_key,
                 base_url=self.api_base,
@@ -305,75 +309,8 @@ class DocumentProcessor:
         Returns:
             AI模型响应
         """
-        settings = get_settings()
-        
-        # 检查是否需要mock AI模型API
-        if settings.is_service_mocked('ai_models'):
-            # 获取mock配置
-            mock_config = settings.get_mock_config('ai_models')
-            delay = mock_config.get('mock_delay', 0.5)
-            
-            # 模拟API调用延迟
-            await asyncio.sleep(delay)
-            
-            # 返回模拟的AI响应
-            return self._create_mock_response(messages)
-        
-        # 生产环境或非mock模式：真实的AI调用
+        # 直接进行真实的AI调用
         return await asyncio.to_thread(self.model.invoke, messages)
-    
-    def _create_mock_response(self, messages):
-        """
-        创建模拟的AI响应
-        
-        Args:
-            messages: 输入消息
-            
-        Returns:
-            模拟响应对象
-        """
-        # 提取文档内容
-        document_content = ""
-        for message in messages:
-            if hasattr(message, 'content') and 'document_content' in message.content:
-                # 简单提取文档内容
-                import re
-                match = re.search(r'文档内容:\s*(.+)', message.content, re.DOTALL)
-                if match:
-                    document_content = match.group(1).strip()[:1000]  # 限制长度
-                    break
-        
-        # 生成模拟的结构化响应
-        mock_sections = []
-        if document_content:
-            # 简单的分段逻辑
-            paragraphs = document_content.split('\n\n')
-            for i, para in enumerate(paragraphs[:5]):  # 最多5段
-                if para.strip() and len(para.strip()) > 20:
-                    mock_sections.append({
-                        "section_title": f"第{i+1}段",
-                        "content": para.strip(),
-                        "level": 1
-                    })
-        
-        if not mock_sections:
-            mock_sections = [{
-                "section_title": "文档内容",
-                "content": document_content or "模拟文档内容",
-                "level": 1
-            }]
-        
-        # 构造JSON响应
-        mock_response = {
-            "sections": mock_sections
-        }
-        
-        # 创建模拟响应对象
-        class MockResponse:
-            def __init__(self, content):
-                self.content = json.dumps(content, ensure_ascii=False, indent=2)
-        
-        return MockResponse(mock_response)
     
     async def analyze_document(self, text: str, prompt_type: str = "preprocess") -> Dict[str, Any]:
         """

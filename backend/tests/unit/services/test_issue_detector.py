@@ -41,7 +41,7 @@ class TestIssueDetector:
         """创建IssueDetector实例"""
         with patch('app.services.issue_detector.ChatOpenAI'):
             with patch('app.services.issue_detector.PydanticOutputParser'):
-                detector = IssueDetector(mock_model_config, mock_db)
+                detector = IssueDetector(mock_model_config['config'], mock_db)
                 return detector
     
     @pytest.fixture
@@ -289,28 +289,27 @@ class TestIssueDetector:
         assert categorized['提示'][0]['type'] == '提示问题'
     
     @pytest.mark.asyncio
-    async def test_call_ai_model_mock_mode(self, issue_detector):
-        """测试Mock模式下的AI调用"""
+    async def test_call_ai_model_integration(self, issue_detector):
+        """测试AI模型调用集成"""
         messages = [Mock(content="测试消息")]
         
-        # Mock settings返回Mock模式
+        # Mock settings返回生产模式，简化测试
         with patch('app.services.issue_detector.get_settings') as mock_settings:
             mock_settings_instance = Mock()
-            mock_settings_instance.is_service_mocked.return_value = True
-            mock_settings_instance.get_mock_config.return_value = {'mock_delay': 0.1}
+            mock_settings_instance.is_service_mocked.return_value = False
             mock_settings.return_value = mock_settings_instance
             
-            # Mock _create_mock_response
-            with patch.object(issue_detector, '_create_mock_response') as mock_create:
-                mock_response = Mock(content='{"issues": []}')
-                mock_create.return_value = mock_response
+            # Mock asyncio.to_thread来模拟AI调用
+            mock_response = Mock(content='{"issues": [{"type": "测试问题", "description": "这是一个测试问题"}]}')
+            with patch('asyncio.to_thread') as mock_to_thread:
+                mock_to_thread.return_value = mock_response
                 
                 # 执行测试
                 result = await issue_detector._call_ai_model(messages)
                 
-                # 验证返回Mock响应
+                # 验证返回响应
                 assert result == mock_response
-                mock_create.assert_called_once_with(messages)
+                mock_to_thread.assert_called_once()
     
     @pytest.mark.asyncio
     async def test_call_ai_model_production_mode(self, issue_detector):
@@ -335,66 +334,64 @@ class TestIssueDetector:
                 assert result == mock_response
                 mock_to_thread.assert_called_once()
     
-    def test_create_mock_response_with_duplicate_words(self, issue_detector):
-        """测试创建Mock响应 - 检测重复字词"""
-        messages = [
-            Mock(content="章节内容: 这是一个的的测试文档")
-        ]
+    def test_mock_service_functionality(self, issue_detector):
+        """测试Mock服务功能"""
+        from tests.fixtures.ai_mock import MockAIServiceProvider
         
-        result = issue_detector._create_mock_response(messages)
+        # 创建Mock服务提供者
+        mock_provider = MockAIServiceProvider({'model': 'test-model'})
         
-        # 验证响应格式
-        assert hasattr(result, 'content')
-        
-        # 解析响应内容
-        response_data = json.loads(result.content)
-        assert 'issues' in response_data
-        
-        issues = response_data['issues']
-        assert len(issues) > 0
-        
-        # 验证检测到重复字词问题
-        duplicate_issue = next((issue for issue in issues if issue['type'] == '错别字'), None)
-        assert duplicate_issue is not None
-        assert '的的' in duplicate_issue['description']
+        # 验证Mock服务基本功能
+        assert mock_provider.is_available() is True
+        assert 'MockAI' in mock_provider.get_provider_name()
+        assert mock_provider.get_document_processor() is not None
     
-    def test_create_mock_response_with_long_sentence(self, issue_detector):
-        """测试创建Mock响应 - 检测长句"""
-        long_sentence = "这是一个非常长的句子" + "，内容很多" * 20 + "。"
-        messages = [
-            Mock(content=f"章节内容: {long_sentence}")
+    def test_issue_detection_performance(self, issue_detector):
+        """测试问题检测性能"""
+        import time
+        
+        # 测试多个章节的处理性能
+        sections = [
+            {"section_title": f"章节{i}", "content": f"这是第{i}个章节的内容" * 10}
+            for i in range(5)
         ]
         
-        result = issue_detector._create_mock_response(messages)
+        start_time = time.time()
+        issues = issue_detector.filter_issues_by_severity([
+            {"type": "测试问题", "confidence": 0.8, "severity": "一般"}
+            for _ in range(100)
+        ])
+        end_time = time.time()
         
-        # 解析响应内容
-        response_data = json.loads(result.content)
-        issues = response_data['issues']
-        
-        # 验证检测到长句问题
-        long_sentence_issue = next((issue for issue in issues if issue['type'] == '句子过长'), None)
-        assert long_sentence_issue is not None
-        assert '建议拆分' in long_sentence_issue['description']
+        # 验证性能（应该在100ms内完成）
+        processing_time = (end_time - start_time) * 1000
+        assert processing_time < 100, f"问题过滤过慢: {processing_time}ms"
     
-    def test_create_mock_response_default_issue(self, issue_detector):
-        """测试创建Mock响应 - 默认问题"""
-        messages = [
-            Mock(content="章节内容: 正常的文档内容，没有明显问题")
+    def test_issue_structure_validation(self, issue_detector):
+        """测试问题结构验证"""
+        # 测试各种问题结构
+        test_issues = [
+            {
+                'type': '错别字',
+                'description': '发现错别字问题',
+                'location': '第1段',
+                'severity': '一般',
+                'confidence': 0.8
+            },
+            {
+                'type': '语法错误', 
+                'description': '发现语法问题',
+                'location': '第2段',
+                'severity': '严重',
+                'confidence': 0.9
+            }
         ]
         
-        result = issue_detector._create_mock_response(messages)
+        # 验证过滤功能
+        filtered = issue_detector.filter_issues_by_severity(test_issues, min_confidence=0.7)
+        assert len(filtered) == 2
         
-        # 解析响应内容
-        response_data = json.loads(result.content)
-        issues = response_data['issues']
-        
-        # 验证至少有一个默认问题
-        assert len(issues) >= 1
-        
-        # 验证问题结构完整
-        for issue in issues:
-            assert 'type' in issue
-            assert 'description' in issue
-            assert 'location' in issue
-            assert 'severity' in issue
-            assert 'confidence' in issue
+        # 验证分类功能
+        categorized = issue_detector.categorize_issues(test_issues)
+        assert len(categorized['严重']) == 1
+        assert len(categorized['一般']) == 1

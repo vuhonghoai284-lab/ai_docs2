@@ -6,6 +6,7 @@ from app.services.interfaces.task_processor import ITaskProcessor, IProcessingCh
 from app.services.interfaces.ai_service import IAIServiceProvider
 from app.services.processors.file_parsing_processor import FileParsingProcessor
 from app.services.processors.document_processing_processor import DocumentProcessingProcessor
+from app.services.processors.section_merge_processor import SectionMergeProcessor
 from app.services.processors.issue_detection_processor import IssueDetectionProcessor
 
 
@@ -23,11 +24,14 @@ class TaskProcessingChain(IProcessingChain):
         # 文档处理处理器
         doc_processor = DocumentProcessingProcessor(self.ai_service_provider)
         
+        # 章节合并处理器
+        section_merger = SectionMergeProcessor()
+        
         # 问题检测处理器
         issue_processor = IssueDetectionProcessor(self.ai_service_provider)
         
-        # 构建链式结构
-        file_parser.set_next(doc_processor).set_next(issue_processor)
+        # 构建链式结构: 文件解析 -> 文档处理 -> 章节合并 -> 问题检测
+        file_parser.set_next(doc_processor).set_next(section_merger).set_next(issue_processor)
         
         return file_parser
     

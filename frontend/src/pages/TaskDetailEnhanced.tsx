@@ -16,6 +16,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { taskAPI } from '../api';
 import { TaskDetail as TaskDetailType, Issue, AIOutput } from '../types';
 import TaskLogs from '../components/TaskLogs';
+import { formatInputText, formatJSON, decodeUnicode, isLikelyJSON } from '../utils/textFormatter';
 import './TaskDetailEnhanced.css';
 
 const { Text, Paragraph, Title } = Typography;
@@ -339,7 +340,7 @@ const TaskDetailEnhanced: React.FC = () => {
             </Col>
             <Col span={4}>
               <Text type="secondary">文件类型</Text>
-              <div><Tag>{task.file_type.toUpperCase()}</Tag></div>
+              <div><Tag>{task.file_type?.toUpperCase() || 'UNKNOWN'}</Tag></div>
             </Col>
           </Row>
         </Card>
@@ -520,10 +521,10 @@ const TaskDetailEnhanced: React.FC = () => {
                                 <Tag color="blue" className="issue-type-tag">[{issue.issue_type}]</Tag>
                                 <Text 
                                   className="issue-description" 
-                                  ellipsis={{ tooltip: issue.description }}
+                                  ellipsis={{ tooltip: decodeUnicode(issue.description) }}
                                   style={{ fontWeight: '500', color: '#262626', flex: 1 }}
                                 >
-                                  {issue.description}
+                                  {decodeUnicode(issue.description)}
                                 </Text>
                               </Space>
                             </div>
@@ -551,7 +552,7 @@ const TaskDetailEnhanced: React.FC = () => {
                                 <Text style={{ fontSize: 13, lineHeight: 1.5, color: '#595959' }}>
                                   <FileTextOutlined style={{ color: '#ff7875', marginRight: 6 }} />
                                   <Text strong style={{ color: '#ff7875', marginRight: 8 }}>原文内容：</Text>
-                                  {issue.original_text}
+                                  {decodeUnicode(issue.original_text)}
                                 </Text>
                               </div>
                             </div>
@@ -564,7 +565,7 @@ const TaskDetailEnhanced: React.FC = () => {
                                 <Text style={{ fontSize: 13, lineHeight: 1.5, color: '#595959' }}>
                                   <EditOutlined style={{ color: '#73d13d', marginRight: 6 }} />
                                   <Text strong style={{ color: '#73d13d', marginRight: 8 }}>改进建议：</Text>
-                                  {issue.suggestion}
+                                  {decodeUnicode(issue.suggestion)}
                                 </Text>
                               </div>
                             </div>
@@ -683,7 +684,7 @@ const TaskDetailEnhanced: React.FC = () => {
                                             <Text strong> 原文内容</Text>
                                           </div>
                                           <div className="comparison-content">
-                                            {issue.original_text || '未提供原文'}
+                                            {issue.original_text ? decodeUnicode(issue.original_text) : '未提供原文'}
                                           </div>
                                         </div>
                                       </Col>
@@ -694,7 +695,7 @@ const TaskDetailEnhanced: React.FC = () => {
                                             <Text strong> 改进建议</Text>
                                           </div>
                                           <div className="comparison-content">
-                                            {issue.suggestion || '未提供建议'}
+                                            {issue.suggestion ? decodeUnicode(issue.suggestion) : '未提供建议'}
                                           </div>
                                         </div>
                                       </Col>
@@ -715,21 +716,21 @@ const TaskDetailEnhanced: React.FC = () => {
                                     <div className="info-item">
                                       <ThunderboltOutlined style={{ color: '#1890ff' }} />
                                       <Text strong> 判定原因：</Text>
-                                      <Text>{issue.reasoning}</Text>
+                                      <Text>{decodeUnicode(issue.reasoning)}</Text>
                                     </div>
                                   )}
                                   {issue.user_impact && (
                                     <div className="info-item">
                                       <UserOutlined style={{ color: '#faad14' }} />
                                       <Text strong> 用户影响：</Text>
-                                      <Text>{issue.user_impact}</Text>
+                                      <Text>{decodeUnicode(issue.user_impact)}</Text>
                                     </div>
                                   )}
                                   {issue.context && (
                                     <div className="info-item">
                                       <FileTextOutlined style={{ color: '#722ed1' }} />
                                       <Text strong> 上下文环境：</Text>
-                                      <Text>{issue.context}</Text>
+                                      <Text>{decodeUnicode(issue.context)}</Text>
                                     </div>
                                   )}
                                 </div>
@@ -994,9 +995,10 @@ const TaskDetailEnhanced: React.FC = () => {
                           overflow: 'auto',
                           whiteSpace: 'pre-wrap',
                           fontFamily: 'monospace',
-                          fontSize: 12
+                          fontSize: 12,
+                          lineHeight: '1.6'
                         }}>
-                          {output.input_text}
+                          {formatInputText(output.input_text)}
                         </div>
                       </Panel>
 
@@ -1018,9 +1020,13 @@ const TaskDetailEnhanced: React.FC = () => {
                           overflow: 'auto',
                           whiteSpace: 'pre-wrap',
                           fontFamily: 'monospace',
-                          fontSize: 12
+                          fontSize: 12,
+                          lineHeight: '1.6'
                         }}>
-                          {output.raw_output}
+                          {isLikelyJSON(output.raw_output) 
+                            ? formatJSON(output.raw_output)
+                            : decodeUnicode(output.raw_output)
+                          }
                         </div>
                       </Panel>
 
@@ -1045,9 +1051,10 @@ const TaskDetailEnhanced: React.FC = () => {
                             <pre style={{ 
                               margin: 0,
                               fontFamily: 'monospace',
-                              fontSize: 12
+                              fontSize: 12,
+                              lineHeight: '1.6'
                             }}>
-                              {JSON.stringify(output.parsed_output, null, 2)}
+                              {decodeUnicode(JSON.stringify(output.parsed_output, null, 2))}
                             </pre>
                           </div>
                         </Panel>
@@ -1065,7 +1072,7 @@ const TaskDetailEnhanced: React.FC = () => {
                           key="error"
                         >
                           <Alert 
-                            message={output.error_message} 
+                            message={decodeUnicode(output.error_message)} 
                             type="error" 
                             showIcon 
                           />

@@ -40,7 +40,9 @@ class Settings:
                 if isinstance(value, str) and value.startswith('${') and value.endswith('}'):
                     env_var = value[2:-1]
                     default_value = self._get_default_value(env_var, value)
-                    config[key] = os.getenv(env_var, default_value)
+                    env_value = os.getenv(env_var, default_value)
+                    print(f"🔄 环境变量替换: {key}={value} -> {env_var}={env_value}")
+                    config[key] = env_value
                 elif isinstance(value, (dict, list)):
                     self._replace_env_vars(value)
         elif isinstance(config, list):
@@ -57,10 +59,48 @@ class Settings:
     @property
     def database_url(self) -> str:
         """数据库连接URL"""
-        db_path = self.config.get('database', './data/app.db')
-        if not db_path.startswith('sqlite://'):
-            db_path = f'sqlite:///{db_path}'
-        return db_path
+        db_config = self.config.get('database', {})
+        
+        # 兼容旧配置格式（直接为字符串）
+        if isinstance(db_config, str):
+            db_path = db_config
+            if not db_path.startswith('sqlite://'):
+                db_path = f'sqlite:///{db_path}'
+            return db_path
+        
+        # 新配置格式（字典）
+        db_type = db_config.get('type', 'sqlite').lower()
+        
+        if db_type == 'mysql':
+            mysql_config = db_config.get('mysql', {})
+            host = mysql_config.get('host', 'localhost')
+            port = mysql_config.get('port', 3306)
+            username = mysql_config.get('username', 'root')
+            password = mysql_config.get('password', '')
+            database = mysql_config.get('database', 'ai_doc_test')
+            charset = mysql_config.get('charset', 'utf8mb4')
+            
+            return f"mysql+pymysql://{username}:{password}@{host}:{port}/{database}?charset={charset}"
+        else:
+            # 默认使用SQLite
+            sqlite_config = db_config.get('sqlite', {})
+            db_path = sqlite_config.get('path', './data/app.db')
+            if not db_path.startswith('sqlite://'):
+                db_path = f'sqlite:///{db_path}'
+            return db_path
+    
+    @property
+    def database_config(self) -> Dict[str, Any]:
+        """获取数据库配置"""
+        return self.config.get('database', {})
+    
+    @property
+    def database_type(self) -> str:
+        """获取数据库类型"""
+        db_config = self.config.get('database', {})
+        if isinstance(db_config, str):
+            return 'sqlite'
+        return db_config.get('type', 'sqlite').lower()
     
     @property
     def upload_dir(self) -> str:
@@ -159,6 +199,22 @@ class Settings:
             'secret_key': 'ai_doc_test_secret_key',
             'algorithm': 'HS256',
             'access_token_expire_minutes': 30
+        })
+    
+    @property
+    def task_processing_config(self) -> Dict[str, Any]:
+        """任务处理配置"""
+        return self.config.get('task_processing', {})
+    
+    @property
+    def section_merge_config(self) -> Dict[str, Any]:
+        """章节合并配置"""
+        task_config = self.task_processing_config
+        return task_config.get('section_merge', {
+            'enabled': True,
+            'max_chars': 5000,
+            'min_chars': 100,
+            'preserve_structure': True
         })
     
     def reload(self, config_file: Optional[str] = None):

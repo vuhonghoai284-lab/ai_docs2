@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { taskAPI } from '../api'
+import { taskAPI } from '../../api'
 
 // Mock fetch
 global.fetch = vi.fn()

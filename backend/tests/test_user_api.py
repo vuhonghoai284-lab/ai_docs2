@@ -64,7 +64,7 @@ class TestUserAPI:
     
     def test_get_all_users_as_admin(self, client: TestClient, auth_headers):
         """测试管理员获取所有用户 - USER-002"""
-        response = client.get("/api/users", headers=auth_headers)
+        response = client.get("/api/users/", headers=auth_headers)
         assert response.status_code == 200
         
         users = response.json()
@@ -79,7 +79,7 @@ class TestUserAPI:
     
     def test_get_all_users_as_normal_user(self, client: TestClient, normal_auth_headers):
         """测试普通用户获取所有用户（应被拒绝）"""
-        response = client.get("/api/users", headers=normal_auth_headers)
+        response = client.get("/api/users/", headers=normal_auth_headers)
         assert response.status_code == 403
         
         error = response.json()
@@ -88,7 +88,7 @@ class TestUserAPI:
     
     def test_get_all_users_without_auth(self, client: TestClient):
         """测试未认证获取所有用户"""
-        response = client.get("/api/users")
+        response = client.get("/api/users/")
         assert response.status_code == 401
 
 
@@ -98,7 +98,7 @@ class TestUserPermissions:
     def test_admin_user_permissions(self, client: TestClient, auth_headers):
         """测试管理员用户权限"""
         # 管理员应该能访问所有用户列表
-        response = client.get("/api/users", headers=auth_headers)
+        response = client.get("/api/users/", headers=auth_headers)
         assert response.status_code == 200
         
         # 管理员应该能看到自己的信息
@@ -110,7 +110,7 @@ class TestUserPermissions:
     def test_normal_user_permissions(self, client: TestClient, normal_auth_headers):
         """测试普通用户权限"""
         # 普通用户不能访问所有用户列表
-        response = client.get("/api/users", headers=normal_auth_headers)
+        response = client.get("/api/users/", headers=normal_auth_headers)
         assert response.status_code == 403
         
         # 普通用户可以看到自己的信息
@@ -176,7 +176,7 @@ class TestUserDataValidation:
     
     def test_user_list_data_structure(self, client: TestClient, auth_headers):
         """测试用户列表数据结构"""
-        response = client.get("/api/users", headers=auth_headers)
+        response = client.get("/api/users/", headers=auth_headers)
         assert response.status_code == 200
         
         users = response.json()
@@ -242,7 +242,7 @@ class TestUserAPIPerformance:
         import time
         
         start_time = time.time()
-        response = client.get("/api/users", headers=auth_headers)
+        response = client.get("/api/users/", headers=auth_headers)
         end_time = time.time()
         
         assert response.status_code == 200

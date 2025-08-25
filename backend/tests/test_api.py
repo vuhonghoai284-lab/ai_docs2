@@ -28,7 +28,7 @@ def test_create_task(client: TestClient, sample_file, auth_headers):
     files = {"file": (filename, content, content_type)}
     data = {"title": "Test Task", "ai_model_index": 0}
     
-    response = client.post("/api/tasks", files=files, data=data, headers=auth_headers)
+    response = client.post("/api/tasks/", files=files, data=data, headers=auth_headers)
     assert response.status_code == 200
     task = response.json()
     assert task["title"] == "Test Task"
@@ -39,7 +39,7 @@ def test_create_task(client: TestClient, sample_file, auth_headers):
 
 def test_get_tasks(client: TestClient, auth_headers):
     """测试获取任务列表"""
-    response = client.get("/api/tasks", headers=auth_headers)
+    response = client.get("/api/tasks/", headers=auth_headers)
     assert response.status_code == 200
     tasks = response.json()
     assert isinstance(tasks, list)
@@ -50,7 +50,7 @@ def test_get_task_detail(client: TestClient, sample_file, auth_headers):
     # 先创建一个任务
     filename, content, content_type = sample_file
     files = {"file": (filename, content, content_type)}
-    create_response = client.post("/api/tasks", files=files, headers=auth_headers)
+    create_response = client.post("/api/tasks/", files=files, headers=auth_headers)
     task_id = create_response.json()["id"]
     
     # 获取任务详情
@@ -104,7 +104,7 @@ def test_get_ai_outputs(client: TestClient, sample_file, auth_headers):
     # 先创建一个任务
     filename, content, content_type = sample_file
     files = {"file": (filename, content, content_type)}
-    create_response = client.post("/api/tasks", files=files, headers=auth_headers)
+    create_response = client.post("/api/tasks/", files=files, headers=auth_headers)
     task_id = create_response.json()["id"]
     
     # 获取AI输出
@@ -119,7 +119,7 @@ def test_delete_task(client: TestClient, sample_file, auth_headers):
     # 先创建一个任务
     filename, content, content_type = sample_file
     files = {"file": (filename, content, content_type)}
-    create_response = client.post("/api/tasks", files=files, headers=auth_headers)
+    create_response = client.post("/api/tasks/", files=files, headers=auth_headers)
     task_id = create_response.json()["id"]
     
     # 删除任务

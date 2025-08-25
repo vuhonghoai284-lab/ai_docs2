@@ -65,16 +65,15 @@ class IssueDetector:
             console_handler.setFormatter(formatter)
             self.logger.addHandler(console_handler)
         
-        # 从配置中提取参数
-        config = model_config.get('config', {})
-        self.provider = model_config.get('provider', 'openai')
-        self.api_key = config.get('api_key')
-        self.api_base = config.get('base_url')
-        self.model_name = config.get('model')
-        self.temperature = config.get('temperature', 0.3)
-        self.max_tokens = config.get('max_tokens', 4000)
-        self.timeout = config.get('timeout', 60)
-        self.max_retries = config.get('max_retries', 3)
+        # 从配置中提取参数 - 直接从model_config获取，因为传入的已经是config部分
+        self.provider = model_config.get('provider', 'openai')  # 这个字段可能不在config中
+        self.api_key = model_config.get('api_key')
+        self.api_base = model_config.get('base_url')
+        self.model_name = model_config.get('model')
+        self.temperature = model_config.get('temperature', 0.3)
+        self.max_tokens = model_config.get('max_tokens', 4000)
+        self.timeout = model_config.get('timeout', 60)
+        self.max_retries = model_config.get('max_retries', 3)
         
         self.logger.info(f"🔍 问题检测器初始化: Provider={self.provider}, Model={self.model_name}")
         
@@ -372,108 +371,8 @@ class IssueDetector:
         Returns:
             AI模型响应
         """
-        settings = get_settings()
-        
-        # 检查是否需要mock AI模型API
-        if settings.is_service_mocked('ai_models'):
-            # 获取mock配置
-            mock_config = settings.get_mock_config('ai_models')
-            delay = mock_config.get('mock_delay', 0.5)
-            
-            # 模拟API调用延迟
-            await asyncio.sleep(delay)
-            
-            # 返回模拟的AI响应
-            return self._create_mock_response(messages)
-        
-        # 生产环境或非mock模式：真实的AI调用
+        # 直接进行真实的AI调用
         return await asyncio.to_thread(self.model.invoke, messages)
-    
-    def _create_mock_response(self, messages):
-        """
-        创建模拟的AI响应
-        
-        Args:
-            messages: 输入消息
-            
-        Returns:
-            模拟响应对象
-        """
-        # 提取章节内容
-        section_content = ""
-        for message in messages:
-            if hasattr(message, 'content') and '章节内容' in message.content:
-                # 简单提取章节内容
-                import re
-                match = re.search(r'章节内容:\s*(.+)', message.content, re.DOTALL)
-                if match:
-                    section_content = match.group(1).strip()[:500]  # 限制长度
-                    break
-        
-        # 生成模拟的问题检测结果
-        mock_issues = []
-        
-        # 简单的规则检测
-        if section_content:
-            # 检查常见问题
-            if '的的' in section_content:
-                mock_issues.append({
-                    "type": "错别字",
-                    "description": "发现重复字词'的的'，可能是输入错误",
-                    "location": "当前章节",
-                    "severity": "一般",
-                    "confidence": 0.9,
-                    "suggestion": "将'的的'修改为'的'",
-                    "original_text": "的的",
-                    "user_impact": "影响阅读流畅性",
-                    "reasoning": "重复字词影响文档质量",
-                    "context": "发现重复字词"
-                })
-            
-            # 检查句子长度
-            sentences = section_content.split('。')
-            for sentence in sentences:
-                if len(sentence) > 100:
-                    mock_issues.append({
-                        "type": "句子过长",
-                        "description": "句子过长，建议拆分为多个短句以提高可读性",
-                        "location": "当前章节",
-                        "severity": "提示",
-                        "confidence": 0.7,
-                        "suggestion": "建议将长句拆分为多个短句",
-                        "original_text": sentence[:30] + "...",
-                        "user_impact": "可能影响理解",
-                        "reasoning": "过长的句子影响阅读理解",
-                        "context": "长句检测"
-                    })
-                    break  # 只报告一个长句问题
-        
-        # 如果没有发现问题，添加一个示例问题
-        if not mock_issues:
-            mock_issues.append({
-                "type": "格式建议",
-                "description": "建议在标题后添加适当的空行以提高可读性",
-                "location": "当前章节",
-                "severity": "提示",
-                "confidence": 0.6,
-                "suggestion": "在标题后添加空行",
-                "original_text": "标题文本",
-                "user_impact": "轻微影响视觉效果",
-                "reasoning": "适当的空白有助于阅读",
-                "context": "格式优化建议"
-            })
-        
-        # 构造JSON响应
-        mock_response = {
-            "issues": mock_issues
-        }
-        
-        # 创建模拟响应对象
-        class MockResponse:
-            def __init__(self, content):
-                self.content = json.dumps(content, ensure_ascii=False, indent=2)
-        
-        return MockResponse(mock_response)
     
     async def analyze_document(self, text: str, prompt_type: str = "detect_issues") -> Dict[str, Any]:
         """

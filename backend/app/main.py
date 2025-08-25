@@ -24,7 +24,8 @@ def create_app() -> FastAPI:
         title="AI文档测试系统API",
         description="基于AI的文档质量检测系统后端API",
         version="2.0.0",
-        debug=settings.server_config.get('debug', False)
+        debug=settings.server_config.get('debug', False),
+        redirect_slashes=False  # 禁用自动斜杠重定向
     )
     
     # 配置CORS
@@ -94,20 +95,10 @@ def setup_routes(app: FastAPI):
     # 注册用户相关路由
     app.include_router(user_view.router, prefix="/api/users", tags=["用户"])
     
-    # 注册AI输出相关路由（任务相关的AI输出）
-    # 单独的AI输出查询路由注册在ai-outputs前缀下
-    from fastapi import APIRouter
-    from app.views.ai_output_view import ai_output_view
-    
-    # 为任务相关的AI输出创建单独的路由
-    task_ai_output_router = APIRouter(tags=["AI输出"])
-    task_ai_output_router.add_api_route("/{task_id}/ai-outputs", ai_output_view.get_task_ai_outputs, methods=["GET"])
-    app.include_router(task_ai_output_router, prefix="/api/tasks")
-    
-    # 为单独的AI输出查询创建路由
-    single_ai_output_router = APIRouter(tags=["AI输出"])
-    single_ai_output_router.add_api_route("/{output_id}", ai_output_view.get_ai_output_detail, methods=["GET"])
-    app.include_router(single_ai_output_router, prefix="/api/ai-outputs")
+    # 注册AI输出相关路由
+    from app.views.ai_output_view import task_ai_output_view, single_ai_output_view
+    app.include_router(task_ai_output_view.router, prefix="/api/tasks", tags=["AI输出"])
+    app.include_router(single_ai_output_view.router, prefix="/api/ai-outputs", tags=["AI输出"])
     
     # 注册问题反馈相关路由
     app.include_router(issue_view.router, prefix="/api/issues", tags=["问题反馈"])
